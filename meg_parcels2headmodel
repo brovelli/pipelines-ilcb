@@ -1,0 +1,305 @@
+function meg_parcels2headmodel(radius)
+
+ft_defaults
+
+%--------------------------------------------------------------------------
+% Directories
+%--------------------------------------------------------------------------
+dirs.brainvisa_db = '/riou/work/comco/brovelli.a/Results/Brainvisa44_db/MEG_TE_filt_fs/';
+dirs.rawdata      = '/riou/work/comco/brovelli.a/Data/Neurophy/MEG_TE/';
+
+
+%--------------------------------------------------------------------------
+% Subjects
+%--------------------------------------------------------------------------
+subjects.dir     = { 'S1' 'S3' 'S4' 'S5' 'S6' 'S7' 'S8' 'S9' 'S10' 'S11' 'S12' 'S13' };% 'S1' 'S1' 'S3' 
+subjects.hemi    = { 'L' 'R' };
+subjects.channel = { 'MEG' '-A151' '-A125' };
+realign          = [ 0 0 0 0 0 0 0 0 0 0 0 0 ];
+segment_vol      = [ 0 0 0 0 0 0 0 0 0 0 0 0 ];
+doLF             = [ 1 1 1 1 1 1 1 1 1 1 1 1 ];
+place_sources    = 0;
+
+%--------------------------------------------------------------------------
+% Load cortical parcels computed with HIPHOP and set sources
+%--------------------------------------------------------------------------
+% Load MEG labels
+fname = [ dirs.rawdata '/Group/MarsAtlas.xls' ];
+T = readtable(fname);
+
+% Volume of a sphere
+vol_sphere = 4/3*pi*radius^3;
+if place_sources
+    for nsub = 1:length(subjects.dir)
+        % Load volumes from Braivisa
+        fname   = [ dirs.brainvisa_db subjects.dir{nsub} '/surface/'  subjects.dir{nsub} '_gyriVolume_deepStruct.nii.gz' ];
+        vol     = ft_read_mri(fname);
+        parcels = vol.anatomy;
+        newparc = zeros(size(parcels));
+
+        % Combine parcels and change labels
+        for nl = ind_source
+            i = find(T.Label_meg == nl);
+            j = [];
+            for ni = 1:length(i)
+                k = find(parcels(:) == T.Label_hiphop(i(ni)));
+                j = [ j ; k ];
+            end
+            newparc(j) = nl;
+        end
+        parcels = newparc; clear parc
+        % Compute volume of each parcel (mod unit sphere of radius)
+        nP = max(parcels(:));
+        for np = 1:nP
+            i = find(parcels(:)==np);
+            % Volume of each parcel in mm3
+            Vol(np) = length(i);
+            % MRI vol res 1x1x1 mm 
+            nS(np) = ceil(length(i)/vol_sphere);
+        end
+        % Do k-means on voxel coordinates
+        coords = [];
+        labels = [];
+        for np = 1:nP
+            % Find coords of parcels in vx
+            i = find(parcels == np);
+            [x, y, z] = ind2sub(size(parcels),i);
+            % k-means
+            [~, xyzC, distC] = kmeans([x y z], nS(np), 'start', 'uniform');
+            coords = [ coords ; xyzC ];
+            labels = [ labels ; np*ones(size(xyzC,1),1) ];
+        end
+        % Store
+        sources{nsub}.vol_parcel = Vol;
+        sources{nsub}.nsources_parcel = nS;
+        sources{nsub}.coords = coords;
+        sources{nsub}.labels = labels;
+        clear parcels
+    end    
+       
+    % Store
+    sources{nsub}.radius = radius;
+    fname = [ dirs.rawdata '/Group/sources_hiphop_' num2str(radius*10) 'mm.mat'];
+    save(fname, 'sources')
+else
+    fname = [ dirs.rawdata '/Group/sources_hiphop_' num2str(radius*10) 'mm.mat'];
+    load(fname)
+end
+
+% -------------------------------------------------------------------------
+%  Realign of anatomical MRI
+% -------------------------------------------------------------------------
+for nsub = 1:length(subjects.dir)
+    
+    % Do realign
+    if realign(nsub)
+        % Load MRI data
+        fname = [ dirs.brainvisa_db subjects.dir{nsub} '/t1mri/default_acquisition/'  subjects.dir{nsub} '.nii.gz' ];
+        mri   = ft_read_mri(fname);
+        % Realign volume
+        cfg         = [];
+        cfg.method  = 'interactive';
+        mri_realign = ft_volumerealign(cfg, mri);
+        fname       = [ dirs.rawdata subjects.dir{nsub} '/MRI/mri_realign_bv.mat'];
+        save(fname, 'mri_realign');
+        MRI_r{nsub} = mri_realign;
+    else
+        fname       = [ dirs.rawdata subjects.dir{nsub} '/MRI/mri_realign_bv.mat'];
+        load(fname);
+        MRI_r{nsub} = mri_realign;
+    end
+end
+      
+% -------------------------------------------------------------------------
+%  Segment of anatomical MRI and LF
+% -------------------------------------------------------------------------
+for nsub = 1:length(subjects.dir)
+    
+    % MRI realign
+    mri_realign = MRI_r{nsub};
+    
+    % Do segment and volume
+    if segment_vol(nsub)
+                
+        % Segment the realigned MRI
+        cfg          = [];
+        cfg.coordsys = 'ctf';
+        cfg.output   = {'brain'};
+        mri_segment  = ft_volumesegment(cfg, mri_realign);      
+        
+        % Check segmentation and mri_realign are in same space
+        mri_segment.transform = mri_realign.transform;
+        mri_segment.anatomy   = mri_realign.anatomy;
+        
+        % Save
+        fname        = [ dirs.rawdata subjects.dir{nsub} '/MRI/mri_segment_bv.mat'];
+        save(fname, 'mri_segment');
+        
+        % Create head model from segmented data
+        cfg        = [];
+        cfg.method = 'singleshell';
+        cfg.tissue = 'brain';
+        mri_vol    = ft_prepare_headmodel(cfg, mri_segment);
+        fname      = [ dirs.rawdata subjects.dir{nsub} '/MRI/mri_vol_bv.mat'];
+        save(fname, 'mri_vol');       
+        
+    else
+        % Load segmented and mri_vol
+        fname = [ dirs.rawdata subjects.dir{nsub} '/MRI/mri_segment_bv.mat'];
+        load(fname)
+        fname = [ dirs.rawdata subjects.dir{nsub} '/MRI/mri_vol_bv.mat'];
+        load(fname)  
+    end
+    
+    if doLF(nsub)
+        
+        % Create grid.pos
+        vx = sources{nsub}.coords;
+        
+        % Check voxel position of sources on MRI
+        ind = sub2ind([256 256 256],round(vx(:,1)),round(vx(:,2)),round(vx(:,3)));
+        F = zeros(256,256,256);
+        F(ind) = 1;
+        F = convn(F, ones(3,3,3),'same');
+        mri_plot = mri_segment;
+        mri_plot.sources = F;
+        cfg              = [];
+        cfg.funparameter = 'sources';
+        ft_sourceplot(cfg,mri_plot);
+        % Save figure
+        fname = [ dirs.rawdata subjects.dir{nsub} '/MRI/MRI_MEGsources_' num2str(radius*10) '.fig'];
+        saveas(gcf, fname, 'fig')
+        close
+        
+        % Load cortical meshes to generate normals
+        hemi = { 'R' 'L' };
+        i = 1;
+        tri_mesh = [];
+        for nh = 1:2
+            % Load white matter mesh to recover normals (left hemisphere)
+            fname   = [ dirs.brainvisa_db subjects.dir{nsub} '/t1mri/default_acquisition/default_analysis/segmentation/mesh/'  subjects.dir{nsub} '_' hemi{nh} 'white.gii' ];
+            g       = gifti(fname);
+            mesh    = export(g, 'fieldtrip');
+            [~, normal] = mesh_normals(mesh.pnt, mesh.tri);
+            % Transform and rotate
+            pnt_mesh = mesh.pnt;
+            tri_mesh = [ tri_mesh ; mesh.tri+i-1 ];
+            nor_mesh = normal;
+            tr = [1, 0, 0 0; 0, 0, 1, 0; 0, -1, 0, 256; 0, 0, 0, 1];
+            % Transformation from MRI volume on points and normals
+            for nv = 1:size(pnt_mesh,1);
+                pnt_mesh_tr(i,:) = pnt_mesh(nv,:) * tr(1:3,1:3)' + tr(1:3,4)';
+                nor_mesh_tr(i,:) = nor_mesh(nv,:) * tr(1:3,1:3)';
+                i = i + 1;
+            end
+        end
+        % Combine hemispheres
+        pnt_mesh = pnt_mesh_tr;
+        nor_mesh = nor_mesh_tr;
+        clear pnt_mesh_tr nor_mesh_tr tri_mesh_tr
+        
+        % Sources on MRI
+        vx = sources{nsub}.coords;
+        ind = sub2ind([256 256 256],round(vx(:,1)),round(vx(:,2)),round(vx(:,3)));
+        Fs = zeros(256,256,256);
+        Fs(ind) = 1;
+        Fs = convn(Fs, ones(1,1,1),'same');
+        
+        % Mesh vertices on MRI
+        vx = pnt_mesh;
+        ind = sub2ind([256 256 256],round(vx(:,1)),round(vx(:,2)),round(vx(:,3)));
+        Fs(ind) = 10;
+        
+        % Check plot vx are in the same space
+        mri_plot = mri_segment;
+        mri_plot.sources = Fs;
+        cfg              = [];
+        cfg.funparameter = 'sources';
+        ft_sourceplot(cfg,mri_plot);
+        % Save figure
+        fname = [ dirs.rawdata subjects.dir{nsub} '/MRI/MRI_WhiteMesh_' num2str(radius*10)  '.fig'];
+        saveas(gcf, fname, 'fig')
+        close
+        
+        % Transform pos_sources 
+        vx = sources{nsub}.coords;
+        for nv = 1:size(vx,1);
+            pos_sources(nv,:) = vx(nv,:) * mri_realign.transform(1:3,1:3)' + mri_realign.transform(1:3,4)';
+        end
+        
+        % Transform pos_mesh
+        vx = pnt_mesh;
+        for nv = 1:size(vx,1);
+            pos_mesh(nv,:) = vx(nv,:) * mri_realign.transform(1:3,1:3)' + mri_realign.transform(1:3,4)';
+        end
+        
+        % Transform nor_mesh
+        vx = nor_mesh;
+        for nv = 1:size(vx,1);
+            nor_sources(nv,:) = vx(nv,:) * mri_realign.transform(1:3,1:3)';
+        end
+        
+        % Find closest position
+        d = sqrt( ( repmat(pos_sources(:,1), 1, size(pos_mesh,1)) - repmat(pos_mesh(:,1), 1, size(pos_sources,1))' ).^2 + ...
+                  ( repmat(pos_sources(:,2), 1, size(pos_mesh,1)) - repmat(pos_mesh(:,2), 1, size(pos_sources,1))' ).^2 + ...
+                  ( repmat(pos_sources(:,3), 1, size(pos_mesh,1)) - repmat(pos_mesh(:,3), 1, size(pos_sources,1))' ).^2 );
+        d = ( d == repmat(min(d,[],2), 1, size(pos_mesh,1)) );
+        [ind_mesh, ind_sou] = find(d' == 1);
+        
+        % Closest normals
+        mom_sources = nor_sources(ind_mesh,:); 
+        clear d ind_mesh 
+                
+        % Check plot
+        ft_plot_mesh(pos_sources)
+        % Plot normals
+        XYZ = [ pos_sources pos_sources+mom_sources ];
+        for nv = 1:size(XYZ,1)
+            line( [XYZ(nv,1) XYZ(nv,4)] , [XYZ(nv,2) XYZ(nv,5)] , [XYZ(nv,3) XYZ(nv,6)] );
+        end
+        % Plot mesh
+        bnd.pnt  = pos_mesh;
+        bnd.tri  = tri_mesh;
+        ft_plot_mesh(bnd)
+        % Save figure
+        fname = [ dirs.rawdata subjects.dir{nsub} '/MRI/WhiteMesh_Sources_Normals_mm' num2str(radius*10)  '.fig'];
+        saveas(gcf, fname, 'fig')
+        close
+        
+        % Prepare lead field for a realistic single-shell model using segmented MRI
+        cd([ dirs.rawdata subjects.dir{nsub} '/1' ]);
+        hdr      = ft_read_header('c,rfDC');
+        hdr.grad = ft_convert_units(hdr.grad, 'mm');
+        
+        % Create Leadfield without moment information
+        cfg            = [];
+        cfg.grad       = hdr.grad;
+        cfg.vol        = mri_vol;
+        cfg.channel    = subjects.channel;
+        cfg.grid.pos   = pos_sources;
+        cfg.grid.unit  = 'mm';
+        [LF] = ft_prepare_leadfield(cfg);
+        % Store moment information for later
+        LF.mom = mom_sources';
+        % Add labels and table HHatlas to MEG used
+        LF.labels = sources{nsub}.labels;
+        LF.T      = T;
+        % Save
+        fname = [ dirs.rawdata subjects.dir{nsub} '/MRI/LF_HH_' num2str(radius*10)  '.mat'];
+        save(fname, 'LF');
+        
+        clear pos pos_mesh pos_mesh_tr pos_sources nor_sources mom_sources pos_sources
+        
+        % Check position
+        ft_plot_vol(mri_vol,'facealpha',0.1)
+        hold
+        ft_plot_sens(hdr.grad)
+        ft_plot_mesh(LF.pos,'vertexcolor', 'r');
+        
+        % Save figure
+        fname = [ dirs.rawdata subjects.dir{nsub} '/MRI/MEGsensors_MRIvol' num2str(radius*10) '.fig'];
+        saveas(gcf, fname, 'fig')
+        close
+    end
+    
+end
