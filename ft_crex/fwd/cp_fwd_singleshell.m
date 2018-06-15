@@ -22,82 +22,78 @@ function Sdb = cp_fwd_singleshell(Sdb)
 %
 %-CREx180530
 
+
+% Number of data to process
 Np = length(Sdb);
 
 % Realigned MRI by Fieldtrip interactive method if not done yet 
-for i = 1 : Np
-    
-    % Check if mri_real already compute   
-    pmri = Sdb(i).mri;
-    pdir = fileparts(pmri);
-    pMreal = [pdir, filesep, 'Mreal.mat'];
-    if ~exist([pdir, filesep, 'mri_real.mat'], 'file') ||...
-            ~exist([pdir, filesep, 'Mreal.mat'], 'file')
-        % Need to read mri file (the one who was stored in BrainVisa database)
-        mri_bv = read_mri(pmri);
-        mri_real = realign_mri(pdir, mri_bv);
-
-        save([pdir, filesep, 'mri_real'], 'mri_real');
-        % Keep transform matrix MRI space -> realigned space
-        Mreal = mri_real.transform/mri_bv.transform;  %#ok
-        save(pMreal, 'Mreal');      
-    end
-    Sdb(i).Mreal = pMreal;
-
+for i = 1 : Np   
+    % Check if mri_real already compute       
+    if isempty(Sdb(i).mri_real)
+        % If not, prepare MRI: read the MRI file, realigne and reslice it, and 
+        % keep the final Mreal transformation matrix 
+        Sdb(i) = prepare_mri(Sdb(i));
+    end    
 end
 
 % Segment realigned MRI if mri_segment not done yet + define the singleshell
 % head model
-% A priori, not need to make the reslice MRI but maybee it was because of the
-% specific MRI file use for these first tests
 for i = 1 : Np
-    
-    % Check if mri_seg exists
-    pmri = Sdb(i).mri;
-    subj = Sdb(i).subj;
-    pdir = fileparts(pmri);
-    pfwd = make_dir([Sdb(i).dir, filesep, 'fwd']);
-    pshell = [pfwd, filesep, 'vol_shell.mat'];
-    if ~exist(pshell, 'file')
-        % Need to read mri file (the one who was stored in BrainVisa database)
-        mri_real = loadvar([pdir, filesep, 'mri_real']);
-        mri_seg = segment_mri(pdir, mri_real, subj);
-        
-
-        %-- Prepare the singleshell head model from segmented MRI_realigned
-        cfg = [];
-        cfg.method = 'singleshell';
-        vol_shell = ft_prepare_headmodel(cfg, mri_seg); 
-        
-        
-        save(pshell, 'vol_shell');
-        
-        %-- Draw figure with MEG channels + head conduction volume
-        pmeg = Sdb(i).meg;
-        draw = filepath_raw(pmeg);
-        if ~isempty(draw)
-            pcor = make_dir([Sdb(i).dir, filesep, 'coreg']);
-            Sgrad = ft_read_sens(draw);
-            cmeg_fwd_checkreg_fig(vol_shell, Sgrad, subj, pcor)
-        else
-            fprintf('Unable to find raw MEG dataset inside this directory :\n%s', pmeg);
-        end
-    else
-        Sdb(i).shell = pshell;
+    if isempty(Sdb(i).shell)
+        Sdb(i) = prepare_singleshell(Sdb(i));
     end
 end
 
+function dps = prepare_singleshell(dps)
 
-function mri_seg = segment_mri(pdir, mri_real, subj)
+pmri = dps.mri;
+subj = dps.subj;
+pdir = fileparts(pmri);
 
+% Create fwd directory to store vol_shell.mat file 
+pfwd = make_dir([dps.dir, filesep, 'fwd']);
+    
+presl = dps.mri_resl;
+% Need to read mri realigned file
+mri_resl = loadvar(presl);
+mri_seg = segment_mri(pdir, mri_resl, subj);
+
+%-- Prepare the singleshell head model from segmented MRI_realigned
+cfg = [];
+cfg.method = 'singleshell';
+vol_shell = ft_prepare_headmodel(cfg, mri_seg);        
+
+pshell = [pfwd, filesep, 'vol_shell.mat'];
+save(pshell, 'vol_shell');
+
+% Keep data path
+dps.shell = pshell;
+
+%-- Draw figure with MEG channels + head conduction volume
+% Place figure in a separated 'coreg' directory to check for the results
+pmeg = dps.meg;
+draw = filepath_raw(pmeg);
+fprintf('\nCo-registration figures...')
+if ~isempty(draw)
+    pcor = make_dir([dps.dir, filesep, 'coreg']);
+    Sgrad = ft_read_sens(draw);
+    cmeg_fwd_checkreg_fig(vol_shell, Sgrad, subj, pcor)
+    fprintf('\nCheck for figures in %s\n', pcor);
+else    
+    warning('Unable to find raw MEG dataset inside:\n%s', pmeg);
+end
+        
+% Segment MRI for singleshell conduction volume definition
+function mri_seg = segment_mri(pdir, mri_resl, subj)
+  
 %-- Segment the realigned MRI
 cfg = [];
 cfg.output= {'brain'};
 cfg.spmversion = 'spm8';
-mri_seg = ft_volumesegment(cfg, mri_real);  
+mri_seg = ft_volumesegment(cfg, mri_resl);  
 
 % Figure
-mri_combine = mri_real;
+mri_combine = mri_resl;
 mri_combine.seg  = double(mri_seg.brain);
 mri_combine.mask = mri_combine.seg(mri_combine.seg>0);
 
@@ -112,19 +108,70 @@ ft_sourceplot(cfg, mri_combine);
 export_fig([pdir, filesep, 'mri_seg_', subj, '.png'], '-m1.5')
 close
 
+% Prepare the MRI for segmentation
+function dps = prepare_mri(dps)
+
+pmri = dps.mri;
+pdir = fileparts(pmri);       
+
+% Need to read mri file (the one who was stored in BrainVisa database)
+% + be sure units are in mm
+mri_bv = read_mri(pmri);
+
+% Be sure about the coordsys
+% mri.coordsys = 'ras';
+% ft_determine_coordsys
+mri_real = realign_mri(pdir, mri_bv);
+
+% Keep transform matrix MRI space -> realigned space
+Mreal = mri_real.transform/mri_bv.transform;  %#ok
+
+
+% Reslice MRI before doing the segmentation
+% Problem with transform matrix still not clear
+cfg = [];
+cfg.resolution = 1;
+cfg.dim = [256 256 256]; % cf. Freesurfer dim
+mri_resl = ft_volumereslice(cfg, mri_real);  %#ok
+
+% Save data in mri dir
+% Save mri_real.mat file in MRI directory
+preal = [pdir, filesep, 'mri_real'];
+save(preal, 'mri_real'); 
+
+% Transformation to MEG space
+pMreal = [pdir, filesep, 'Mreal.mat'];
+save(pMreal, 'Mreal');    
+
+% Save mri_resl.mat file in MRI directory
+presl = [pdir, filesep, 'mri_resl'];
+save(presl, 'mri_resl');
+
+% Keep paths
+dps.mri_real = preal;
+dps.mri_resl = presl;
+dps.Mreal = pMreal;
+        
 % Realign MRI using fieldtrip
 function mri_real = realign_mri(pdir, mri)
 
 cfg = [];
 
+% Set default coordsys ('nas', 'lpa', 'rpa' and 'zpoint' are expected)
+cfg.coordsys = 'ctf';
+
 % Look for fiducial coordinates that was already picked
-        
-% Case 1 : Fiducial coordinates inside mri file (cf. with BrainStorm)
+% - Case 1 : Fiducial coordinates inside mri file (cf. with BrainStorm)
+% - Case 2 : fid.mat hold fiducial coordinates in mri directory
+% Otherwise, 'interactive' method is set
+
+% Case 1 - fid inside mri.hdr
 if isfield(mri,'hdr') && isfield(mri.hdr,'fiducial')...
         && isfield(mri.hdr.fiducial,'mri')
     cfg.fiducial = mri.hdr.fiducial.mri;
 else
-    % Check for fid mat ("fid" structure with fields "nas", "lpa", "rpa" "zpoint"
+    % Check for fid mat ("fid" structure with fields "nas", "lpa", "rpa"
+    % "zpoint")
     % TO ADD = read fid.txt containing fid info too
     pfid = [pdir, filesep, 'fid.mat'];
     isfid = exist(pfid, 'file');
@@ -134,20 +181,18 @@ else
         cfg.method = 'interactive';
     end
 end
+
 mri_real = ft_volumerealign(cfg, mri);
 
-function mri = read_mri(pmri)
-
-%-- Read MRI as imported from BrainVisa database
-if strcmp(pmri(end-1:end), 'gz')
-    ptest = gunzip(pmri);
-    pmri = ptest{1};
-end
-
-ft_tool('freesurfer', 'add');
-% Home-made function use to prevent bug with the ft_hastoolbox function that seems occured
-% when other toolbox hab been added in matlab path ?? (spm12 ?)
-% >> Error using ft_hastoolbox (line 450) - the FREESURFER toolbox is not installed, see http://surfer.nmr.mgh.harvard.edu/fswiki
-% >> Error in ft_read_mri (line 393) >> ft_hastoolbox('freesurfer', 1);
-mri = ft_read_mri(pmri);
-mri.coordsys = 'ras';
+% Be sure mri_real voxels are homogenous isotropic (cf. Fardin Afdideh suggestion)
+% for segmentation to be done by segment_mri
+% "Segmentation works properly when the voxels of the anatomical images are
+% homogenous isotropic, i.e., have a uniform thickness for each slice"
+% % if sum(diff(mri_real.dim)) ~= 0
+%     cfg = [];
+%     cfg.resolution = 1;
+%     cfg.dim = [256 256 256]; % cf. Freesurfer dim
+%     mri_resl = ft_volumereslice(cfg, mri_real);
+% % end
+% 
+% Mtr = mri_resl.transform/mri_real.transform; 

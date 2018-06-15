@@ -1,8 +1,8 @@
 function cmeg_fwd_checkreg_fig(vol, grad, infodata, savpath)
-% Check coregistration figure
-% vol : head model volume (singleshell)
-% grad : MEG sensor grad structure with sensors coordinates
-% infodata : additionnal information to add on the figure (in figure title) [default : '']
+% Figure showing result of co-registration headmodel // MEG sensors
+% vol : head model (cf. singleshell)
+% grad : MEG sensors structure with sensors coordinates as output by ft_read_sens 
+% infodata : additionnal information to be added on the figure title [default : '']
 % savpath : directory path where to save the figure (if not specified, figure
 %           will be generated but not saved) [default: []]
 %
@@ -16,12 +16,16 @@ if nargin < 4 || isempty(savpath)
 else
     sav = 1;
 end
+
+% Be sure units in mm
+vol = ft_convert_units(vol, 'mm');
+grad = ft_convert_units(grad, 'mm');
+
 % Select only MEG label A* for plotting
 clab = char(grad.label);
 idplot = strfind(clab(:,1)','A');
 
-% Set coordinate units to mm (from m)
-chanpos = grad.chanpos.*1000; 
+chanpos = grad.chanpos; 
 chanpos = chanpos(idplot,:);
 
 figure

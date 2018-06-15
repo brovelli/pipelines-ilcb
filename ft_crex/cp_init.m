@@ -15,8 +15,6 @@ function Sdb = cp_init(Sdir)
 Sdp = struct('iproc', [], 'group', []);
 Sdir = check_opt(Sdir, Sdp);
 
-
-
 % Define all datapaths from ft database
 dp_meg = meg_datapaths(Sdir);
 
@@ -28,7 +26,13 @@ for i = 1 : Ns
     dps.trans = prep_trans(dps, Sdir);
     % Add mri, surf, vol and tex files paths
     % File expected with extension gii or nii or gz
+    
     dps = add_anat(dps);
+    
+    % Add already process file path (MAT) if exists
+    dps = add_mat(dps);
+    
+    % Expected MEG data directory
     dps.meg = [dps.dir, filesep, 'meg'];
     
     if i==1
@@ -38,7 +42,6 @@ for i = 1 : Ns
     end
 end
 
-
 function dps = add_anat(dps)
 
 dps.surf = find_files([dps.dir, filesep, 'surf']);
@@ -46,6 +49,34 @@ dps.tex = find_files([dps.dir, filesep, 'tex']);
 dps.vol = find_files([dps.dir, filesep, 'vol']);
 pmri = find_files([dps.dir, filesep, 'mri']);
 dps.mri = pmri{1};
+
+function dps = add_mat(dps)
+% Add already processed file if exist
+
+% Realignment transformation matrix
+dps = add_fpath(dps, [dps.dir, filesep, 'mri', filesep, 'Mreal.mat'], 'Mreal');
+
+% MRI real
+dps = add_fpath(dps, [dps.dir, filesep, 'mri', filesep, 'mri_real.mat'], 'mri_real');
+
+% MRI resl
+dps = add_fpath(dps, [dps.dir, filesep, 'mri', filesep, 'mri_real.mat'], 'mri_resl');
+
+% Conduction volume
+dps = add_fpath(dps, [dps.dir, filesep, 'fwd', filesep, 'vol_shell.mat'], 'shell');
+
+% MarsAtlas
+dps = add_fpath(dps, [dps.dir, filesep, 'atlas', filesep, 'marsatlas.mat'], 'atlas');
+
+
+function dps = add_fpath(dps, fpath, fnam)
+
+if exist(fpath, 'file')
+    dps.(fnam) = fpath;
+else
+    dps.(fnam) = [];
+end
+
 
 % Prepare transform mat for the forward model
 function ptr = prep_trans(dps, Sdir)
@@ -72,15 +103,12 @@ if isempty(dmat)
         
     end
 end
-        
-        
 
 % Find all directories for MEG data processing
 function dp = meg_datapaths(Sdir)
 
 % Main database directory
 db_dir = Sdir.db_ft;
-
 
 % Add group level directory if Sdir.group is not empty
 if ~isempty(Sdir.group)
@@ -104,8 +132,7 @@ iproj = 2;
 dp = cell2struct([alldp'; subj'; grp'; prj'], {'dir', 'subj', 'group', 'proj'});
 
 iproc = Sdir.iproc;
-if ~isempty(iproc)
-    if max(iproc) <= length(alldp)
-        dp = dp(iproc);
-    end
+
+if ~isempty(iproc) && max(iproc) <= length(alldp)
+    dp = dp(iproc);
 end

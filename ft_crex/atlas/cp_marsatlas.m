@@ -8,109 +8,79 @@ function Sdb = cp_marsatlas(Sdb)
 %
 %-CREx180530
 
+% Number of data to process
 Np = length(Sdb);
 
 for i = 1 : Np
     
-    %-- Data paths
-    
-    % Surface files from BV/FS pipeline (Left and Right)
-    psurf = Sdb(i).surf;
-    Nh = length(psurf);
-    
-    % Associated texture files (Left and Right)
-    ptex = Sdb(i).tex;
-    
-    % Volume MarsAtlas
-    pvol = Sdb(i).vol{1};
-    
-    % Mtrans_ref to realign surf and vol  
-    ptrans = Sdb(i).trans;
-    
-    % Mreal of MRI subject according to fiducial
-    pMreal = Sdb(i).Mreal;
-    
-    % Conduction volume for figure of coregistration
-    pshell = Sdb(i).shell;
-    
-    %-- Load data 
-    
-    % Read MarsAtlas surface files + add textures information
-    masurf = cell(Nh, 1);
-    for k = 1 : Nh
-        psurfh = psurf{k};
-        [~, snam] = fileparts(psurfh);
-        % Define if Left or Right according to surf name ('Lwhite' or 'Rwhite')
-        % Normally, Lwhite is in k==1 and Rwhite in k==2 as path list is
-        % returned in alphabetic order - but in case of...
-        if ~isempty(strfind(snam, 'Lwhite')) %#ok
-            % snam = 'Lwhite';
-            namh = 'surf_L';
-        else
-            % snam = 'Rwhite';
-            namh = 'surf_R';
-        end
-        masurfh = read_gii(psurfh);
-        % ptex list of file in the same order as psurf a priori (if not, see to
-        % find the corresponding ptex depending on snam)
-        masurfh.tex = read_gii(ptex{k}); 
-        masurfh.name = namh;
-        masurf{k} = masurfh;        
-    end
-    
-    % Read MarsAtlas volume
-    mavol = read_mars_vol(pvol);
-    
-    % Transformation matrices
-    % to realign surf and vol in subject MRI space
-    Meach = loadvar(ptrans);
-    Msu2bv = Meach{1}*Meach{2};
-    Mvo2bv = inv(Meach{4}*Meach{3});
-
-    % to realign according to fiducial
-    Mreal = loadvar(pMreal);
-    
-
-    % Realign MarsAtlas
-    
-    %-- Surface
-    % Total transform
-    Mt_su = Mreal*Msu2bv;
-    for k = 1 : Nh
-        masurf{k} = ft_transform_geometry(Mt_su, masurf{k});
-    end
-    
-    %-- Volume
-    % Total transform
-    Mt_vo = Mreal*Mvo2bv;  %#ok
-    % The transform field of mavol atlas will be change according to previous
-    % transfom + Mt_vol
-    mavol = ft_transform_geometry(Mt_vo, mavol); 
-    
-    % Save atlas file
-    marsatlas = [];
-    marsatlas.surf = masurf;
-    marsatlas.vol = mavol;
-    
-    patlas = [make_dir([Sdb(i).dir, filesep, 'atlas']), filesep, 'marsatlas.mat'];
-    save(patlas, 'marsatlas');
-    
-    Sdb(i).atlas = patlas;
-    
-    % Load volume of condution for figure
-    shell = loadvar(pshell);
-    
-    % Figure will be saved in coreg directory
-    pcor = make_dir([Sdb(i).dir, filesep, 'coreg']);
-    
-    % Neeed for raw MEG data file to superimpose sensors
-    pmeg = Sdb(i).meg;
-
-    coreg_fig(marsatlas, shell, pmeg, pcor);
-        
+    % Check if marsatlas already defined
+    if isempty(Sdb(i).atlas)
+        Sdb(i) = prepare_atlas(Sdb(i));
+    end     
 end
 
+function dps = prepare_atlas(dps)
 
+%-- Read MarsAtlas surface files from BV/FS pipeline (Left and Right) 
+% + textures information
+masurf = read_mars_surf(dps.surf, dps.tex);
+% Number of surf files
+Nh = length(masurf);
+
+%-- Read MarsAtlas volume
+pvol = dps.vol{1};
+mavol = read_mars_vol(pvol);
+
+%-- Transformation matrices
+%* to realign surf and vol in subject MRI space
+Meach = loadvar(dps.trans);
+Msu2bv = Meach{1}*Meach{2};
+Mvo2bv = inv(Meach{4}*Meach{3});
+
+%* to realign according to fiducial
+Mreal = loadvar(dps.Mreal);    
+
+%-- Realign MarsAtlas
+
+%- Surface
+% Total transform
+Mt_su = Mreal*Msu2bv;
+for k = 1 : Nh
+    masurf{k} = ft_transform_geometry(Mt_su, masurf{k});
+end
+
+%- Volume
+% Total transform
+Mt_vo = Mreal*Mvo2bv;  %#ok
+% The transform field of mavol atlas will be change according to previous
+% transfom + Mt_vol
+mavol = ft_transform_geometry(Mt_vo, mavol); 
+
+% Save atlas file
+marsatlas = [];
+marsatlas.surf = masurf;
+marsatlas.vol = mavol;
+
+patlas = [make_dir([dps.dir, filesep, 'atlas']), filesep, 'marsatlas.mat'];
+save(patlas, 'marsatlas');
+
+dps.atlas = patlas;
+
+% Load volume of condution for figure
+shell = loadvar(dps.shell);
+
+% Figure will be saved in coreg directory
+pcor = make_dir([dps.dir, filesep, 'coreg']);
+
+% Neeed for raw MEG data file to superimpose sensors
+pmeg = dps.meg;
+
+% Check for coregistration of all the things of the universe
+coreg_fig(marsatlas, shell, pmeg, pcor);
+    
+
+% Figure showing superimposition of marsatlas surface + volume, + head model
+% with MEG sensor
 function coreg_fig(marsatlas, shell, pmeg, pfig)
 
 masurf = marsatlas.surf;
