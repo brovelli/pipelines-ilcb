@@ -18,7 +18,7 @@ if ~extft
     % Try to add toolbox with ft_hastoolbox
     % Sometimes cause error => try catch to avoid it
     try 
-        statut = ft_hastoolbox(toolname, 1);
+        statut = ft_hastoolbox(toolname, 1, 1);
     catch
         statut = 0;
     end

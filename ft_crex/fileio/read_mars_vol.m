@@ -1,12 +1,5 @@
 function vol = read_mars_vol(pvol)
-
-
-% Unzip volume parcellation file with gunzip Matlab function 
-if strcmp(pvol(end-1:end), 'gz')
-    puv = gunzip(pvol);
-    pvol = puv{1};
-end
-
+% Read marsatlas volumetric file by using ft_read_mri
 [pdir, vnam] = fileparts(pvol);
 
 % altas_label & labelinfo from ft_crex toolbox
@@ -32,11 +25,14 @@ function atlas = read_atlas_ft(pvol, labelinfo)
 lab = labelinfo.label;
 idx = labelinfo.index;
 
-atlas = ft_read_mri(pvol);
+% Read MRI with ft_read_mri and check for units (be sure to be as default units
+% which are 'mm')
+atlas = read_mri(pvol);
+
 atlas.tissue = atlas.anatomy;
 atlas = rmfield(atlas, 'anatomy');
-atlas.coordsys = 'mni';
 
+atlas.coordsys = 'mni'; % ? don't remember why...
 atlas.tissuelabel       = {};
 atlas.tissuelabel(idx)  = lab;
 
@@ -56,5 +52,3 @@ atlas.tissue = reshape(tis, atlas.dim);
 [a, ~, k] = unique(atlas.tissue);
 atlas.tissue = reshape(k-1, atlas.dim);
 atlas.tissuelabel = atlas.tissuelabel(a(a~=0));
-
-

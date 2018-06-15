@@ -19,7 +19,7 @@ for i = 1 : Np
         pmo = psubj.model;
         model = loadvar(pmo);
         % Only subcortical for now !!
-        if isfield(model, 'subcortical') && ~isempty(model, 'subcortical')
+        if isfield(model, 'subcortical') && ~isempty(model.subcortical)
             adone = 1;
         end
     end

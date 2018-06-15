@@ -20,7 +20,7 @@ for i = 1 : Np
     if isfield(psubj, 'sources')
         pso = fileparts(psubj.sources);
         sources = loadvar(psubj.sources);
-        if isfield(sources, 'subcortical') && ~isempty(sources, 'subcortical')
+        if isfield(sources, 'subcortical') && ~isempty(sources.subcortical)
             adone = 1;
         end
     else
