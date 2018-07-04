@@ -11,6 +11,13 @@ if nargin < 2 || isempty(new)
     new = 0;
 end
 
+% Directory already exists
+if ~new && exist(dirpath, 'dir')
+    % Return the full path
+    fpath = fullpath(dirpath);
+    return
+end
+
 % Remove double filesep 
 dirpath = regexprep(dirpath, '\\\', '\\');
 
@@ -59,8 +66,10 @@ else
         mkdir(dirpath);
     end
 end
+fpath = fullpath(dirpath);
+
 % Return the full path
-fpath = dirpath;
-if isempty(strfind(fpath, filesep))
-    fpath = [pwd, filesep, fpath];
+function dirpath = fullpath(dirpath)
+if isempty(strfind(dirpath, filesep))  %#ok
+    dirpath = [pwd, filesep, dirpath];
 end

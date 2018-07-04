@@ -1,0 +1,5 @@
+attributes = {
+    'data_type' : 'VOID',
+    'polygon_dimension' : 3,
+    'vertex_number' : 54138
+  }

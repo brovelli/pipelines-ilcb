@@ -20,7 +20,10 @@ function Sdb = cp_fwd_singleshell(Sdb)
 % Processing are not applied if files have been previously processed at subject
 % level.
 %
-%-CREx180530
+% % TO ADD = read fid.txt containing fid info too  
+%   Figure showing fid location on MRI
+%
+%-CREx-180704
 
 
 % Number of data to process
@@ -71,7 +74,7 @@ dps.shell = pshell;
 
 %-- Draw figure with MEG channels + head conduction volume
 % Place figure in a separated 'coreg' directory to check for the results
-pmeg = dps.meg;
+pmeg = dps.meg.continuous.raw{1};
 draw = filepath_raw(pmeg);
 fprintf('\nCo-registration figures...')
 if ~isempty(draw)
@@ -80,7 +83,7 @@ if ~isempty(draw)
     cmeg_fwd_checkreg_fig(vol_shell, Sgrad, subj, pcor)
     fprintf('\nCheck for figures in %s\n', pcor);
 else    
-    warning('Unable to find raw MEG dataset inside:\n%s', pmeg);
+    fprintf('Unable to find raw MEG dataset to add sensor positions\npath=%s\n', pmeg);
 end
         
 % Segment MRI for singleshell conduction volume definition
@@ -164,25 +167,32 @@ cfg.coordsys = 'ctf';
 % - Case 1 : Fiducial coordinates inside mri file (cf. with BrainStorm)
 % - Case 2 : fid.mat hold fiducial coordinates in mri directory
 % Otherwise, 'interactive' method is set
+pfid = [pdir, filesep, 'fid.mat'];
+if ~exist(pfid, 'file') 
+    % Try to find fid in mri.hdr field
+    if isfield(mri,'hdr') && isfield(mri.hdr,'fiducial')...
+            && isfield(mri.hdr.fiducial,'mri')
+        fid = mri.hdr.fiducial.mri;
 
-% Case 1 - fid inside mri.hdr
-if isfield(mri,'hdr') && isfield(mri.hdr,'fiducial')...
-        && isfield(mri.hdr.fiducial,'mri')
-    cfg.fiducial = mri.hdr.fiducial.mri;
-else
-    % Check for fid mat ("fid" structure with fields "nas", "lpa", "rpa"
-    % "zpoint")
-    % TO ADD = read fid.txt containing fid info too
-    pfid = [pdir, filesep, 'fid.mat'];
-    isfid = exist(pfid, 'file');
-    if isfid
-        cfg.fiducial = loadvar(pfid);
+        cfg.fiducial = fid;
+        
+        % Save fid
+        save(pfid, 'fid');
     else
         cfg.method = 'interactive';
     end
+else
+    % Check for fid mat ("fid" structure with fields "nas", "lpa", "rpa"
+    % "zpoint")
+    cfg.fiducial = loadvar(pfid);
 end
 
 mri_real = ft_volumerealign(cfg, mri);
+
+if strcmp(mri_real.cfg.method, 'interactive')
+    fid = mri_real.cfg.fiducial; %#ok
+    save(pfid, 'fid');
+end
 
 % Be sure mri_real voxels are homogenous isotropic (cf. Fardin Afdideh suggestion)
 % for segmentation to be done by segment_mri

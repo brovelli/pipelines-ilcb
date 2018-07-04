@@ -2,13 +2,18 @@ function vol = read_mars_vol(pvol)
 % Read marsatlas volumetric file by using ft_read_mri
 [pdir, vnam] = fileparts(pvol);
 
+% Case for .nii.gz file (will be unziped by read_mri for ft_read_mri)
+if strcmp(vnam(end-2:end), 'nii')
+    vnam = vnam(1:end-4);
+end
+
 % altas_label & labelinfo from ft_crex toolbox
 plabel = which('atlas_label.txt');
 pinfo = 'labelinfo.mat';
 
 % Copy atlas_label file in th esame directory as volume file
 % Rename atlas_label with volume file name
-copyfile(plabel, [pdir, vnam, '.txt']);
+copyfile(plabel, [pdir, filesep, vnam, '.txt']);
 
 labelinfo = loadvar(pinfo, 'labelinfo');
 

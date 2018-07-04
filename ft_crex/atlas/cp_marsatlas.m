@@ -5,6 +5,7 @@ function Sdb = cp_marsatlas(Sdb)
 % - Realign according to fiducial previously indicated (cp_fwd_singleshell)
 %
 %   --> marsatlas.mat saved inside db_ft/PROJ/SUBJ/atlas
+%       == marsatlas structure with fields "surf" and "vol"
 %
 %-CREx180530
 
@@ -67,13 +68,17 @@ save(patlas, 'marsatlas');
 dps.atlas = patlas;
 
 % Load volume of condution for figure
-shell = loadvar(dps.shell);
+if isfield(dps, 'shell') && exist(dps.shell, 'file')
+    shell = loadvar(dps.shell);
+else
+    shell = [];
+end
 
 % Figure will be saved in coreg directory
 pcor = make_dir([dps.dir, filesep, 'coreg']);
 
 % Neeed for raw MEG data file to superimpose sensors
-pmeg = dps.meg;
+pmeg = dps.meg.continuous.raw{1};
 
 % Check for coregistration of all the things of the universe
 coreg_fig(marsatlas, shell, pmeg, pcor);
@@ -92,20 +97,35 @@ ir = cellfun(@(x) strcmp(x.name, 'surf_R'), masurf);
 %-- Visualize
 
 % Head model + surfaces
-plot_meshes([{shell}; masurf], {'shellcond'; masurf{1}.name;  masurf{2}.name})
+opt = [];
+opt.visible = 'off';
+if ~isempty(shell)
+    shell.name = 'shellcond';
+end
+
+plot_meshes([{shell}; masurf], opt);
 view(30, 10)
 title('Single-shell conduction volume and MarsAtlas surface')
 axis tight
+    
+
+% Print
 saveas(gcf, [pfig, filesep, 'marsatlas_surf_shellcond.fig'])
 export_fig([pfig, filesep, 'marsatlas_surf_shellcond.png'], '-m2')
 close
 
 % Headmodel, Right MA surface + Left MA volume
-plot_vol(mavol, 1:41)
-plot_meshes({masurf{ir}, shell}, {masurf{ir}.name, 'shellcond'}, [0 0.9 0.7; 1 0.4 0.4], 0)
+plot_vol(mavol, 1:41, 0)
+
+% Superimpose Mesh
+opt.newfig = 0;
+opt.colors = [0 0.9 0.7; 1 0.4 0.4];
+plot_meshes({masurf{ir}, shell}, opt);
 view(122, 10)
 rotate3d off
 title('Click on a MarsAtlas parcel to get its name', 'color', [1 1 1])
+
+% Print
 saveas(gcf, [pfig, filesep, 'marsatlas_surfR_vol_shellcond.fig'])
 export_fig([pfig, filesep, 'marsatlas_surfR_vol_shellcond.png'], '-m2')
 close
@@ -113,18 +133,103 @@ close
 % Add the MEG sensors
 %- Looking for the raw MEG data in pmeg directory
 draw = filepath_raw(pmeg);
-if ~isempty(draw)
-    % Check reg MEG + vol model only
-    Sgrad = ft_read_sens(draw);
-
-    % Everything on the same figure (volumetric MarsAtlas (Right) + the Right
-    % MarsAtlas surface + the singleshell head model + the MEG sensors
-    plot_vol(mavol, 1:41)
-    plot_meshes({masurf{ir}, shell}, {masurf{ir}.name, 'shellcond'}, [0 0.9 0.7; 1 0.4 0.4], 0)
-    plot_megchan(Sgrad)
-    view(160, 10)    
-    title('Cliquer sur une parcelle MarsAtlas pour afficher son nom', 'color', [1 1 1])
-    saveas(gcf, [pfig, filesep, 'marsatlas_surfR_vol_shellcond_megsens.fig'])
-    export_fig([pfig, filesep, 'marsatlas_surfR_vol_shellcond_megsens.png'], '-m2')
-    close
+if isempty(draw)
+    return;
 end
+
+% Check reg MEG + vol model only
+Sgrad = ft_read_sens(draw);
+
+% Everything on the same figure (volumetric MarsAtlas (Right) + the Right
+% MarsAtlas surface + the singleshell head model + the MEG sensors
+plot_vol(mavol, 1:41, 0);
+
+% surface_R + shell volume
+opt.newfig = 0;
+[hm, hleg] = plot_meshes({masurf{ir}, shell}, opt);
+
+% MEG sensors
+plot_megchan(Sgrad)
+
+
+view(160, 10)    
+title('Cliquer sur une parcelle MarsAtlas pour afficher son nom', 'color', [1 1 1])
+
+%- Print
+saveas(gcf, [pfig, filesep, 'marsatlas_surfR_vol_shellcond_megsens.fig'])
+export_fig([pfig, filesep, 'marsatlas_surfR_vol_shellcond_megsens.png'], '-m2')
+
+
+% Try to add the headshape
+hs = read_headshape(pmeg);
+
+if isempty(hs)
+    close
+    return;
+end
+
+% Headshape (MEG source)
+ps = plot3c(hs.pos,'kd');
+set(ps, 'markerfacecolor', [0.85 0 0], 'markersize',5, 'PickableParts', 'none');
+
+% Add fiducials
+fid = hs.fid;
+% Nasion;
+isf = cellfun(@(x) strcmpi(x(1), 'n'), fid.label);
+pnas = plot3c(fid.pos(isf, :), 'd');
+set(pnas, 'markerfacecolor', [0 0.4 0.9], 'markersize', 16,...
+    'markeredgecolor', [0.9 0.75 0], 'linewidth', 2);
+
+% LPA
+isf = cellfun(@(x) strcmpi(x(1), 'l'), fid.label);
+pleft = plot3c(fid.pos(isf, :), 'd');
+set(pleft, 'markerfacecolor', [0.9 0.75 0], 'markersize', 16,...
+    'markeredgecolor', [0 0.9 0], 'linewidth', 2);
+
+% RPA
+isf = cellfun(@(x) strcmpi(x(1), 'r'), fid.label);
+pright = plot3c(fid.pos(isf, :), 'd');
+set(pright, 'markerfacecolor', [0.85 0.33 0.1], 'markersize', 16,...
+    'markeredgecolor', [0 0.75 0.75], 'linewidth', 2);
+
+view(90, 0)
+
+delete(hleg)
+put_legend([hm ; pnas ; pleft ; pright], {'surf_R', 'shellcond', 'NAS', 'LPA', 'RPA'});
+
+%- Print
+saveas(gcf, [pfig, filesep, 'marsatlas_surfR_vol_shellcond_megsens_fid.fig'])
+export_fig([pfig, filesep, 'marsatlas_surfR_vol_shellcond_megsens_fid.png'], '-m2')
+
+close
+
+% Add meshes legend
+function lg = put_legend(hdl, names) 
+
+% Plot legend 
+lg = legend(hdl, names,'location','eastoutside');   
+
+% Set new position
+pos = [0.84199 0.60382 0.14519 0.3193]; 
+set(lg, 'position', pos,...
+    'interpreter', 'none', 'fontsize', 11,...
+    'EdgeColor', 'none', 'color', [0.98 0.96 0.96], 'autoupdate', 'off')  
+
+% The color rectangles are of type 'patch' and the
+% associated texts of type 'text'.
+
+% Reduced rectangle size
+cpa = findobj(lg, 'type', 'patch');
+for j = 1 : length(cpa)
+    xd = get(cpa(j), 'XData');
+    newxd = [xd(1:2); xd(3:4)./2]; 
+    set(cpa(j), 'XData', newxd)
+end
+% Move text closer to the color rectangle
+ctx = findobj(lg, 'type', 'text');
+for k = 1 : length(ctx)
+    pos = get(ctx(k), 'position');
+    pos(1) = newxd(3) + 0.02; 
+    set(ctx(k),'position', pos);
+end 
+
