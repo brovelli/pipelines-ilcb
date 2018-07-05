@@ -267,7 +267,7 @@ subcor.unit = 'mm';
 
 %-- Figure
 % Figure showing subcortical region + sources
-plot_vol(atlas, isub);
+plot_vol(atlas, isub, 0);
 plot3(subpos(:, 1), subpos(:, 2), subpos(:, 3), 'og')
 title('Check for subcortical sources', 'color', [1 1 1])
 saveas(gcf, [pfig, filesep, 'sources_subcortical.fig'])
