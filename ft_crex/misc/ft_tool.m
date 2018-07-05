@@ -4,7 +4,7 @@ function statut = ft_tool(toolname, sopt, extft)
 % remove from matlab's current paths (sopt='rm') [ default: sopt = 'add' ]
 % extft flag : = 1 to add toolbox that is external to the "fieltrip/external" directory
 %
-%-CREx-180411
+%-CREx-180629
 
 if nargin < 2 || isempty(sopt) || ~ischar(sopt)
     sopt = 'add';
@@ -14,7 +14,7 @@ if nargin < 3
 end
 
 
-if ~extft 
+if strcmp(sopt, 'add') && ~extft 
     % Try to add toolbox with ft_hastoolbox
     % Sometimes cause error => try catch to avoid it
     try 
@@ -23,12 +23,6 @@ if ~extft
         statut = 0;
     end
     if statut
-        % Remove paths
-        if strcmp(sopt, 'rm')
-            % Get the paths (main + sub-directories)
-            ptools = get_added;
-            rmpaths(ptools)
-        end
         return;
     end
 end
@@ -41,7 +35,7 @@ if strcmp(sopt, 'add')
         warning(['Impossible to find ', toolname,' toolbox - Check for toolbox directory name'])
     else
         statut = 1;
-        fprintf('\nAdding %s toolbox to paths\n', ptool);
+        % fprintf('\nAdding %s toolbox to paths\n', ptool);
         addpath(genpath(ptool))
     end
     return;
@@ -59,7 +53,7 @@ if ~isempty(ptools)
     for i = 1 : Np
         rmpath(ptools{i})
     end
-    fprintf('Removing toolbox and subdirectories \n%s \n', ptools{1});
+    % fprintf('Removing toolbox and subdirectories \n%s \n', ptools{1});
 end
 
 % Find the previously added tool
@@ -73,13 +67,6 @@ if any(ismain)
 else
     ptools = [];
 end
-
-% Find the last added toolbox + subdirectories
-function ptools = get_added
-% Last added toolbox
-allpath = strsplit(path, ';');
-pmain = allpath{1};
-ptools = find_alldir(pmain, allpath);
 
 function ptools = find_alldir(maindir, allpath)
 % Find all children directories (inside pmain) + pmain

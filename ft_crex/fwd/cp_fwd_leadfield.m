@@ -2,10 +2,11 @@ function Sdb = cp_fwd_leadfield(Sdb)
 % Prepare leadfield for subcortical and/or cortical sources depending on
 % source.mat fieldnames (see cp_sources_*.m)
 %
-%   --> fwdmodel.mat saved inside db_ft/PROJ/SUBJ/sources
-%       containing head model, source and leadfield for subsortical regions
+%   --> model.mat saved inside db_ft/PROJ/SUBJ/sources
+%       containing headmodel, source grid with leadfield and associated brain atlas region 
 %
-% TO DO : ADD CORTICAL SOURCES (only subcortical here)
+% TO DO : CHECK FOR LEADFIELD normalize parameter
+%
 %-CREx180530
 
 Np = length(Sdb);
@@ -14,48 +15,59 @@ Np = length(Sdb);
 for i = 1 : Np
     psubj = Sdb(i);
     % Check if already done
-    adone = 0;
-    if isfield(psubj, 'model')
-        pmo = psubj.model;
-        model = loadvar(pmo);
-        % Only subcortical for now !!
-        if isfield(model, 'subcortical') && ~isempty(model.subcortical)
-            adone = 1;
-        end
-    end
-    
-    if ~adone
-        
-        modl = set_model(Sdb(i));  %--TO DO - include cortical sources !!
-        
-        model.subcortical = modl.subcortical;
-    
-        % Save model data
-        pfwd = fileparts(Sdb(i).shell);
-        pmod = [pfwd, filesep, 'model.mat']; 
-        save(pmod, 'model')
-        Sdb(i).model = pmod;
 
-        %-- Figure of model geometry       
-        model_geom_fig(modl.subcortical, pfwd)
+    if isfield(psubj, 'model') && exist(psubj.model, 'file')
+        % Already done
+        continue
     end
-        
+    
+    % Set forward model for both cortical and subcortical
+    model = set_model(Sdb(i));  
+
+    % Save model data
+    pfwd = fileparts(Sdb(i).shell);
+    pmod = [pfwd, filesep, 'model.mat']; 
+    save(pmod, 'model')
+
+    % Update Sdb paths
+    Sdb(i).model = pmod;
+
+    % Leadfield matrix figures
+    % Cortical
+    if ~isempty(model.cortical)
+        leadfield_fig(model.cortical.grid, pfwd, 'cortical')
+
+    end
+
+    % Subcortical
+    if ~isempty(model.subcortical)
+        leadfield_fig(model.subcortical.grid, pfwd, 'subcortical')
+    end
+
+    %-- Figure of model geometry       
+    cp_fwd_model_fig(model, pfwd)
+      
 end
 
+% Define fwd model for cortical and (or) subcortical sources
+% model.cortical and model.subcortical both with field:
+% - grid: source model with associated leadfield matrices
+% - headmodel: volume of conduction
+% - atlas: atlas information to identify region of each source
 function model = set_model(psubj)
 %-- Load data
 
 % Conduction volume for figure of coregistration
 pshell = psubj.shell;
-shell = loadvar(pshell);
+volshell = loadvar(pshell);
 
 % Sources (subcortical for now) -- TO DO : LOOP with cortical too
 pso = psubj.sources;
 sources = loadvar(pso);
-subso = sources.subcortical;
 
-% Path to raw MEG data
-pmeg = psubj.meg;
+
+% Path to raw MEG data %%%% TO DO : to preprocessed / epoched/run_concat
+pmeg = psubj.meg.continuous.raw{1};
 
 %- Looking for the raw MEG data in pmeg directory
 draw = filepath_raw(pmeg);
@@ -63,55 +75,115 @@ draw = filepath_raw(pmeg);
 % Get sensor position
 Sgrad = ft_read_sens(draw);
 
+%----
+% Create lead field = forward solution
+
+% Only select MEG label 
+% Sgrad = Strials.(fcond{1}).grad;
+% chanlab = Strials.(fcond{1}).label'; 
+% % ftTuto : "essential to indicate removing sensors when calculating the lead fields"
+% Sgrad = ft_convert_units(Sgrad,'mm');
+%%% TO DO - chansel from preprocessing MEG data !!!
+chansel = ft_channelselection('meg', Sgrad.label);
+
+model = [];
+model.subcortical = prepare_model(sources.subcortical, volshell, Sgrad, chansel);
+model.cortical = prepare_model(sources.cortical, volshell, Sgrad, chansel);
+
+
+
+function mdl = prepare_model(grid, shell, grad, chan)
+if isempty(grid)
+    mdl = [];
+    return
+end
+
 % Prepare source model
 % Add 'inside' field if necessary (if customised grid)
-if ~isfield(subso, 'inside')
+if ~isfield(grid, 'inside')
     cfg = [];
-    cfg.grid = subso;
+    cfg.grid = grid;
     cfg.headmodel = shell;
     grid = ft_prepare_sourcemodel(cfg);
 end
 
-%----
-% Create lead field = forward solution
+if isfield(grid, 'mom')
+    grid.mom = grid.mom';
+end
 
-% Only select MEG label --> TO ADAPT for other data than 4D 
-chanlab = ft_channelselection('A*', Sgrad.label);
 cfg = [];
-cfg.grad = Sgrad;
+cfg.grad = grad;
 cfg.headmodel = shell;
 cfg.grid = grid;
 cfg.reducerank = 2;
-cfg.channel = chanlab;  
-cfg.normalize = 'yes';
+cfg.channel = chan;  
 ldf_grid = ft_prepare_leadfield(cfg);
 
+% Figure showing the leadfield
+
+% cfg.normalize = 'yes';
+% If you are not contrasting the activity of interest against another condition or baseline time-window, 
+% then you may choose to normalize the lead field (cfg.normalize='yes'), which will help control
+% against the power bias towards the center of the head. 
+
 % Keep source label
-ldf_grid.atlaslabel= subso.label;
+mdl = [];
+mdl.grid = ldf_grid;
+mdl.headmodel = shell;
+mdl.atlas = grid.label;
 
-model.subcortical.grid = ldf_grid;
-model.subcortical.headmodel = shell;
+function leadfield_fig(ldf_grid, pfig, styp)
+
+Nc = length(ldf_grid.label);
+ins = ldf_grid.inside;
+Ns = sum(ins);
+
+ldfs = ldf_grid.leadfield{find(ins==1, 1, 'first')};
+Nd = length(ldfs(1, :));
+
+ldf = cell2mat(ldf_grid.leadfield);
+
+ldf = reshape(ldf, Nc, Nd, Ns);
+
+if Nd==1
+    sdir = {'mom'};
+else
+    sdir = {'x', 'y', 'z'};
+end
+
+figure
+
+set(gcf, 'visible', 'off', 'units','centimeters','position', [5 5 30 15])
+
+for i = 1 : Nd
     
-function model_geom_fig(modl, pfig)
-so = [];
-so.pos = modl.grid.pos;
-so.label = modl.grid.atlaslabel;
+    subplot(1, 3, i)
+    
+    imagesc(squeeze(ldf(:, i, :)))
 
-shell = modl.headmodel;
+    xlabel('Dipole number','fontsize',12)
+    ylabel('Channel number','fontsize',12)
+    
+    set(gca,'ydir','normal', 'fontsize',11, 'fontweight', 'bold')
 
-cp_fwd_model_fig(so, shell)
+    title({'Leadfield matrix';['in ', sdir{i}, '-direction']},...
+        'fontsize',12, 'fontweight','normal')
+end
 
-ht = title('Click on source to display its atlas region', 'color', [1 1 1], 'fontsize', 14);
-export_fig([pfig, filesep, 'forward_model_geom.png'], '-m2');
-saveas(gcf, [pfig, filesep, 'forward_model_geom.fig']) 
+colormap(colormap_blue2red)
+caxis([min(ldf(:)) max(ldf(:))])
 
-% Add MEG channels
-delete(ht)
-Sgrad = modl.grid.cfg.grad;
-plot_megchan(Sgrad)
-view(180, 0)
+for i = 1 : Nd
+    subplot(1, 3, i)
+    pos = get(gca, 'position');
+    set(gca, 'position', [pos(1)-0.006 pos(2:end)])
+end
+g = colorbar;
+if Nd >= 3
+    set(g, 'position', [0.9344 0.1664 0.0122 0.3201])
+else
+    set(g, 'position', [0.369 0.1664 0.0122 0.3201])
+end
 
-export_fig([pfig, filesep, 'forward_model_geom_megsens.png'], '-m2');
-saveas(gcf, [pfig, filesep, 'forward_model_geom_megsens.fig']) 
-
-close 
+export_fig([pfig, filesep, 'leadfield_', styp,'.png'], '-m2', '-c[NaN,NaN,NaN,NaN]', '-p0.01')
+close

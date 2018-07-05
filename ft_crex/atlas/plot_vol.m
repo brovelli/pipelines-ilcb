@@ -1,4 +1,13 @@
-function plot_vol(atlas, idx)
+function plot_vol(atlas, idx, fvis)
+if nargin < 3
+    fvis = 1;
+end
+
+if fvis==1
+    fvis = 'on';
+else
+    fvis = 'off';
+end
 % Just to check volume
 Nlab = length(atlas.tissuelabel);
 if nargin > 1 && isempty(idx)
@@ -35,7 +44,7 @@ Ntis = length(Alab);
 colc = color_group(Ntis);
 
 figure, 
-set(gcf,'units','centimeters', 'position', [10 7 28 20],'color',[0 0 0])
+set(gcf, 'visible', fvis, 'units','centimeters', 'position', [10 7 28 20],'color',[0 0 0])
 set(gca,'color',[0 0 0], 'position',[0.005 0.00 .99 .92])
 
 hold on

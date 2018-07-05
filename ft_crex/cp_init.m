@@ -33,7 +33,10 @@ for i = 1 : Ns
     dps = add_mat(dps);
     
     % Expected MEG data directory
-    dps.meg = [dps.dir, filesep, 'meg'];
+    % Check for raw data ==> create grad.mat, hs.mat and event.mat for coreg
+    % figures + the raw meg datapath list + the continuous + epoched that is
+    % concat
+    dps.meg = cp_db_megpaths(make_dir([dps.dir, filesep, 'meg']));
     
     if i==1
         Sdb = dps;
@@ -41,6 +44,9 @@ for i = 1 : Ns
         Sdb(i) = dps;
     end
 end
+
+
+
 
 function dps = add_anat(dps)
 
@@ -60,13 +66,17 @@ dps = add_fpath(dps, [dps.dir, filesep, 'mri', filesep, 'Mreal.mat'], 'Mreal');
 dps = add_fpath(dps, [dps.dir, filesep, 'mri', filesep, 'mri_real.mat'], 'mri_real');
 
 % MRI resl
-dps = add_fpath(dps, [dps.dir, filesep, 'mri', filesep, 'mri_real.mat'], 'mri_resl');
+dps = add_fpath(dps, [dps.dir, filesep, 'mri', filesep, 'mri_resl.mat'], 'mri_resl');
 
 % Conduction volume
 dps = add_fpath(dps, [dps.dir, filesep, 'fwd', filesep, 'vol_shell.mat'], 'shell');
 
+% Sources location
+dps = add_fpath(dps, [dps.dir, filesep, 'fwd', filesep, 'sources.mat'], 'sources');
+
 % MarsAtlas
 dps = add_fpath(dps, [dps.dir, filesep, 'atlas', filesep, 'marsatlas.mat'], 'atlas');
+
 
 
 function dps = add_fpath(dps, fpath, fnam)
@@ -82,25 +92,24 @@ end
 function ptr = prep_trans(dps, Sdir)
 
 ptrans = make_dir([dps.dir, filesep, 'trans']);
-dtrm = dir([ptrans, filesep, '*.trm']);
+
 % Expected transform mat
 ptr = [ptrans, filesep, 'Mtrans_ref.mat'];
 dmat = dir(ptr);
 if isempty(dmat)
-    pref = fullfile(Sdir.db_ft, dps.proj, 'referential', 'referential.txt');
-    if isempty(dtrm)
-        % trm files are expected in standard BV and FS databases according to
-        % referential.txt file // IF TRM files are always the same from BV/FS pipeline, 
-        % we should integrate the referential file inside ft_crex toolbox
-        Mtrans_ref = read_trans_each(pref, dps.subj, Sdir.db_bv, Sdir.db_fs);
-        if ~isempty(Mtrans_ref)
-            save(ptr, 'Mtrans_ref');
-        else
-            ptr = [];
-        end
+
+    % trm files are expected in standard BV and FS databases according to
+    % referential.txt file // IF TRM files are always the same from BV/FS pipeline, 
+    % we should integrate the referential file inside ft_crex toolbox
+    opt = [];
+    opt.db_dir.bv = fullfile(Sdir.db_bv, dps.proj, dps.group, dps.subj);
+    opt.db_dir.fs = fullfile(Sdir.db_fs, dps.proj, dps.group, dps.subj);
+    opt.trans_dir = ptrans;
+    Mtrans_ref = read_trans(opt);
+    if ~isempty(Mtrans_ref)
+        save(ptr, 'Mtrans_ref');
     else
-        % TO DO !! trm in trans directory
-        
+        ptr = [];
     end
 end
 
