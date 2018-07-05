@@ -18,7 +18,7 @@ function ptex = cp_hiphop_tex(pmesh)
 
 % Read the mesh file
 Smesh = read_gii(pmesh);
-Npt = length(Smesh.pnt(:, 1));
+Npt = length(Smesh.pos(:, 1));
 
 ndec = [1000 2000 3000 4000];
 sdec = {'1K', '2K', '3K', '4K'};
