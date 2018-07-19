@@ -253,11 +253,12 @@ end
 % Copy MarsAtlas volume file from BRAINVISA_DATABASE to FIELDTRIP_DATABASE
 function copy_vol(Sbv, pbvin, pout)
 pvol = dir(fullfile(Sbv.dir, pbvin));
+folder  = fileparts(fullfile(Sbv.dir, pbvin));
 if isempty(pvol)
     warning('\nMRI file not found in BRAINVISA_DATABASE for subject %s\n', Sbv.subj)
     warning('Please copy the required files inside \n%s\n', pout)
 else
-    copyfile([pvol(1).folder, filesep, pvol(1).name], pout)
+    copyfile(folder, filesep, pvol(1).name], pout)
 end
 
 function Sdir = make_mdir(proot, cdir)
