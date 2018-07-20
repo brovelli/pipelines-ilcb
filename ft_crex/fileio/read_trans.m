@@ -86,6 +86,7 @@ for i = 1 : Nt
     end
     ptr = strrep(ptr, '{0}', '*');
     dtr = dir(ptr);
+    dtr.folder  = fileparts(ptr);  % for matlab version < 2017
             
     if isempty(dtr)
         warning('Unable to access the transform matrix file\n%s\n', ptr);
