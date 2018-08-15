@@ -6,6 +6,9 @@
 %   Do nothing if data previously imported or if path to brainvisa database is
 %   not valid
 %
+%-- Prepare MEG data: bad channels, components from ICA, strong
+%   artefacts and bad trials identification 
+%
 %-- Prepare the anatomical and atlas files:
 %   ask once for fiducials by fieldtrip interactive method if no previously saved fid.mat file
 %   is found or no fid found in the raw mri file (mri.hdr.fiducial.mri)
@@ -13,13 +16,12 @@
 %-- Prepare the forward model:
 %   coregistration, singleshell conduction volume, subcortical and cortical
 %   sources with associated atlas labels
-% 
-%-- Prepare MEG data: TO DO
 %
 %-- Compute the leadfield:
 %   depending on the MEG channel selection from preprocessed MEG data
 %
-%
+% TO DO: optimize processing time by asking for FID + MEG preprocessing
+% parameters the earliest as possible
 
 %_________INPUTS
 
@@ -35,7 +37,7 @@ dsources_mm = 5;
 % + We should have a copy of the transformation files inside db_ft/trans
 % directories (no more need of db_brainvisa and db_freesurfer paths)
 
-pdb = ['F:', filesep, 'db_pip_decim_test'];
+pdb = ['D:', filesep, 'db_pip_decim_test'];
 
 Sdir = [];
 
@@ -73,48 +75,89 @@ Sdir.group = [];
 % -- a string with a jocker '*' (ex. 'subj*')
 %   --> all subject directories with matching names are searched inside project directory
 % -- a cell of string: {'subject_01', 'subject_04'} or {'control*', 'patient*'}
-Sdir.subj = 'subj*';
+Sdir.subj = 'subject_*';
 
-% Indices of subjects to process if several directories are found according to
-% dir.subjects indication
-% Empty [] to process all subjects matching with dir.subjects list
-Sdir.iproc = [];
+%------------ MEG data processing options
+mopt = [];
+%- Filtering continuous data
+mopt.continuous.filt.type = 'bp';
+mopt.continuous.filt.fc = [0.5 250];
+
+%- ICA component rejection 
+mopt.continuous.ica.reject = 1;
+mopt.continuous.ica.numcomp = 'all';
+
+% Remove the same bad channels selection per subject for all run ('same') 
+% or make a channel selection for each run ('each')
+mopt.continuous.rm_sens_run = 'same';
+
+%- Functions to define trials / conditions -- project specific
+% Trigfun make the link between markers values (/type) and condition names
+% Trialfun allows to sort trials depending on response (to define correct
+% trial for example). If trialfun is empty, the default ft_trialfun_general
+% is used.
+mopt.epoched.trigfun = 'trigfun_te';
+mopt.epoched.trialfun = 'trialfun_te';
+
+%- Epoching condition if associated epoching intervals (dt_s) are not the
+% same (if empty, all conditions as defined in trigfun will be extracted)
+mopt.epoched.conditions = {'S'; 'A'; 'R'; 'SAR'};
+% Associated epoching times (one row per condition to define different epoching
+% versions / only one row to apply the same epoching interval for all
+% conditions) [prestim poststim] in second with positive values
+mopt.epoched.dt_s = [3 3 ; 3 3; 3 3; 1.5 5];
+
+%%% TO ADD
+% Baseline intervals for each conditions (cf. for study with priming, 
+% default being the part of each epoch that is in the negative time part ( t < 0s)
+% If the number of condition is > 1 and bsl_dt_s is a 1x2 vector, the same
+% baseline interval will be used for all conditions.
+% If bsl_dt_s is set to empty, no baseline correction/ normalisation will
+% be done.
+% Time interval relative to the epoching time vector (ex. [-3 -2] s)
+% mopt.epoched.bsl_dt_s = 
+
+%- Resampling of epoching data
+mopt.epoched.resample_fs = 1000;
+
+% Remove the same bad trials selection per subject for all conditions ('same')
+% or define a bad trials selection for each condition ('each')
+mopt.epoched.rm_trials_cond = 'same';
 
 % Don't forget to add fieldtrip toolbox (Mars 2018)
 
 %___________________ END OF INPUT
-
 
 addpath(genpath('ft_crex'))
 cp_pref
 ft_defaults
 
 % Import all required files in FIELDTRIP_DATABASE
-% if not done yet
-% = files from anatomical preprocessing in Brainvisa 
-% + trm files
+% if not done yet = files from anatomical preprocessing in Brainvisa/Freesurfer 
 % + raw MEG data
-% If Sdir.db_bv is not a valid path to reach brainvisa database,
+% If Sdir.db_bv is not a valid path to reach brainvisa database, data importation
+% is not done
 cp_db_import(Sdir);
 
 % Get the subjects list to process depending on Sdir information
 Sdb = cp_init(Sdir);
 
-% Prepare single shell volume if not yet done
+% Prepare single shell volume if not done yet
+% Ask for fid information
 Sdb = cp_fwd_singleshell(Sdb);
+
+% Prepare MEG data for source estimations
+Sdb = cp_meg_prep(Sdb, mopt);
 
 % Prepare atlas files (surf + vol)
 Sdb = cp_marsatlas(Sdb);
 
-% Add sources (for subcortical and cortical parcels) 
+% Define sources (for subcortical and cortical parcels) 
 Sdb = cp_fwd_sources(Sdb, dsources_mm);
-
-%%% TO DO: meg preprocessing before leadfield computation
-% Sdb = cp_meg_preproc(Sdb, popt);
 
 % Prepare source model including leadfield and head model => for the leadfield
 % computation, we need to have the final CHANNEL selection depending on MEG data
-% processing
+% processing and of the run (cf. if not the same channel selection / run)
 Sdb = cp_fwd_leadfield(Sdb);  
 
 %... To be continued...
@@ -129,5 +172,5 @@ Sdb = cp_fwd_leadfield(Sdb);
 % % cfg.lcmv.lambda     = '5%';
 % % cfg.lcmv.keepfilter = 'yes';
 % % cfg.lcmv.fixedori   = 'yes'; % L'orientation est calculee via une ACP // orientation 3 dipoles
-% % sourceAll  = ft_sourceanalysis(cfg, avgTrialsAll);
+% % sourceAll  = ft_sourceanalysis(cfg, cleanTrials.S);
 

@@ -42,6 +42,6 @@ axis tight equal off;
 set(gcf, 'WindowButtonDownFcn', @dispname);
 
 psav = fullfile(savpath, ['atlas_ROIpatch_', num2str(Ntis),'.fig']);
-saveas(gcf, psav);
+save_fig(psav);
 
 fprintf('\n\nAtlas ROI patches figure saved here:\n %s\n', savpath);

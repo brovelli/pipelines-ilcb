@@ -70,7 +70,7 @@ annotation(gcf,'textbox','String',titfig,'interpreter','none',...
 
 if sav
     namfig = 'checkreg_chanvol';
-    export_fig([savpath,filesep,namfig,'.jpeg'],'-m1.5')
+    export_fig([savpath,filesep,namfig,'.png'],'-m1.5')
     close
 end
 

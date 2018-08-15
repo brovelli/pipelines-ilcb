@@ -32,7 +32,7 @@ Np = length(Sdb);
 % Realigned MRI by Fieldtrip interactive method if not done yet 
 for i = 1 : Np   
     % Check if mri_real already compute       
-    if isempty(Sdb(i).mri_real)
+    if isempty(Sdb(i).anat.mri_real)
         % If not, prepare MRI: read the MRI file, realigne and reslice it, and 
         % keep the final Mreal transformation matrix 
         Sdb(i) = prepare_mri(Sdb(i));
@@ -42,21 +42,21 @@ end
 % Segment realigned MRI if mri_segment not done yet + define the singleshell
 % head model
 for i = 1 : Np
-    if isempty(Sdb(i).shell)
+    if isempty(Sdb(i).fwd.shell)
         Sdb(i) = prepare_singleshell(Sdb(i));
     end
 end
 
 function dps = prepare_singleshell(dps)
 
-pmri = dps.mri;
-subj = dps.subj;
+pmri = dps.anat.mri;
+subj = dps.info.subj;
 pdir = fileparts(pmri);
 
 % Create fwd directory to store vol_shell.mat file 
 pfwd = make_dir([dps.dir, filesep, 'fwd']);
     
-presl = dps.mri_resl;
+presl = dps.anat.mri_resl;
 % Need to read mri realigned file
 mri_resl = loadvar(presl);
 mri_seg = segment_mri(pdir, mri_resl, subj);
@@ -70,7 +70,7 @@ pshell = [pfwd, filesep, 'vol_shell.mat'];
 save(pshell, 'vol_shell');
 
 % Keep data path
-dps.shell = pshell;
+dps.fwd.shell = pshell;
 
 %-- Draw figure with MEG channels + head conduction volume
 % Place figure in a separated 'coreg' directory to check for the results
@@ -114,7 +114,7 @@ close
 % Prepare the MRI for segmentation
 function dps = prepare_mri(dps)
 
-pmri = dps.mri;
+pmri = dps.anat.mri;
 pdir = fileparts(pmri);       
 
 % Need to read mri file (the one who was stored in BrainVisa database)
@@ -139,7 +139,7 @@ mri_resl = ft_volumereslice(cfg, mri_real);  %#ok
 
 % Save data in mri dir
 % Save mri_real.mat file in MRI directory
-preal = [pdir, filesep, 'mri_real'];
+preal = [pdir, filesep, 'mri_real.mat'];
 save(preal, 'mri_real'); 
 
 % Transformation to MEG space
@@ -147,13 +147,13 @@ pMreal = [pdir, filesep, 'Mreal.mat'];
 save(pMreal, 'Mreal');    
 
 % Save mri_resl.mat file in MRI directory
-presl = [pdir, filesep, 'mri_resl'];
+presl = [pdir, filesep, 'mri_resl.mat'];
 save(presl, 'mri_resl');
 
 % Keep paths
-dps.mri_real = preal;
-dps.mri_resl = presl;
-dps.Mreal = pMreal;
+dps.anat.mri_real = preal;
+dps.anat.mri_resl = presl;
+dps.anat.Mreal = pMreal;
         
 % Realign MRI using fieldtrip
 function mri_real = realign_mri(pdir, mri)

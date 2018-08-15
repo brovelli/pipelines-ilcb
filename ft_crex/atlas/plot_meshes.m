@@ -144,7 +144,7 @@ lg = legend(hdl, names,'location','eastoutside');
 pos = [0.773 0.72 0.20 0.098]; 
 set(lg, 'position', pos,...
     'interpreter', 'none', 'fontsize', 11,...
-    'EdgeColor', 'none', 'color', [0.98 0.96 0.96], 'autoupdate', 'off')  
+    'EdgeColor', 'none', 'color', [0.98 0.96 0.96])  
 
 % The color rectangles are of type 'patch' and the
 % associated texts of type 'text'.

@@ -86,14 +86,13 @@ for i = 1 : Nt
     end
     ptr = strrep(ptr, '{0}', '*');
     dtr = dir(ptr);
-    dtr.folder  = fileparts(ptr);  % for matlab version < 2017
             
     if isempty(dtr)
         warning('Unable to access the transform matrix file\n%s\n', ptr);
         Meach = [];
         return;
     end
-    ptr = [dtr.folder, filesep, dtr(1).name];     
+    ptr = [ptrans, filesep, dtr(1).name];     
         
     fid = fopen(ptr, 'r');
     Cmat = textscan(fid, '%f');

@@ -10,12 +10,7 @@ function dispname(~, ~)
 % 
 %-CREx170118-- ft_CREx toolbox
 
-% First click ?
-if isempty(get(get(gca,'title'),'string'))
-    first = true;
-else
-    first = false;
-end
+% first = isfirst;
 
 % Background color to define color of the title
 if all(get(gcf,'color'))
@@ -27,7 +22,10 @@ end
 % If object is of type line (marker), its size is slightly increased when
 % it is selected and color changed to green-blue
 gobj = gco;
-if isprop(gobj, 'type') && isprop(gobj, 'displayname')
+if gobj==gca || gobj==gcf || (isprop(gobj, 'type') && strcmp(gobj.Type, 'text'))
+    title('');
+end
+if isprop(gobj, 'type') && isprop(gobj, 'displayname') && ~isempty(get(gobj, 'displayname'))
     typ = get(gobj, 'type');
     dnam = get(gobj, 'displayname');
 
@@ -49,20 +47,30 @@ if isprop(gobj, 'type') && isprop(gobj, 'displayname')
     
     title(dnam,'fontsize',24, 'color', titcol,'interpreter','none');
 
+    
     set_prop(gobj, curprop);
 
     set(gcf, 'WindowButtonDownFcn', {@after_click, gobj, iniprop});
     
-    if first
-        set_prop(gobj, iniprop)
-    end
-    
+%     if first
+%         set_prop(gobj, iniprop)
+%     end
     set(gcf, 'WindowButtonUpFcn', @dispname);
 end
 
+% function first = isfirst
+% ao = findobj(gcf, '-property', 'displayname');
+% adisp = {ao(:).DisplayName};
+% stit = get(get(gca,'title'),'string');
+% if ~any(strcmp(adisp, stit))
+%     first = true;
+% else
+%     first = false;
+% end
 
 function after_click(~, ~, gobj, prop)
 set_prop(gobj, prop)
+
         
 function set_prop(gobj, prop)
 Np = length(prop(:,1));

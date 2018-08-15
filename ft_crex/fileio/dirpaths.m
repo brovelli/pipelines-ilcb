@@ -6,7 +6,8 @@ if isempty(dd)
     return
 end
 % Get the full path
-pdir = dd(1).folder;
+% dd(1).folder --> only for Matlab>2016 -- we keep pdir hoping it's a full path
+% pdir = dd(1).folder;
 Nd = length(dd);
 plist = cell(Nd, 1);
 for i = 1 : Nd

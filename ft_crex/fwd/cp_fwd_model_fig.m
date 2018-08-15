@@ -61,7 +61,7 @@ annotation(gcf,'textbox', 'String', ['Forward model geometry - ', styp],...
     
 ht = title('Click on source to display its atlas region', 'color', [1 1 1], 'fontsize', 14);
 export_fig([pfig, filesep, 'forward_model_', styp, '.png'], '-m2');
-saveas(gcf, [pfig, filesep, 'forward_model_', styp, '.fig']) 
+save_fig([pfig, filesep, 'forward_model_', styp, '.fig']) 
 
 % Add MEG channels
 delete(ht)
@@ -70,8 +70,7 @@ plot_megchan(Sgrad)
 view(180, 0)
 
 export_fig([pfig, filesep, 'forward_model_', styp, '_megsens.png'], '-m2');
-saveas(gcf, [pfig, filesep, 'forward_model_', styp, '_megsens.fig']) 
-
+save_fig([pfig, filesep, 'forward_model_', styp, '_megsens.fig']) 
 close 
 
 % Define the sphere patches at dipole locations 
@@ -81,7 +80,7 @@ Ndip = length(dip_pos);
 
 %----
 % Set dipoles spheres
-[Xsph, Ysph, Zsph] = sphere(24); 
+[Xsph, Ysph, Zsph] = sphere(10); 
 % Unit sphere with N=42 faces - Xb, Yb and Zb are (N+1) x (N+1) matrices
 % using by surf(Xb, Yb, Zb) to draw the sphere
 % Set radius of sphere representing dipoles = 6 mm
