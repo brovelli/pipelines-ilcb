@@ -1,6 +1,6 @@
 function Smeg = cp_db_megpaths(pmeg)
 %-- Prepare MEG data paths from the meg directory in FIELDTRIP_DATABASE
-% The MEG data directory as prepare by cp_db_import should have this
+% The MEG data directories as prepared by cp_db_import should have this
 % structure:
 % meg / 
 %   --- continuous 
@@ -14,6 +14,10 @@ function Smeg = cp_db_megpaths(pmeg)
 % subject, data (raw and mat) should be directly found in 'continuous/raw', 
 % 'continuous/preproc' and 'epoched' directories
 %
+% The hdr_event structure is created inside each raw data directory in hdr_event.mat file.
+% This structure holds general information from the raw data as returned by ft_read_header, 
+% the events read by ft_read_event and the headshape if a headshape file was found.
+%
 %-CREx-180702
 
 prepare_db_meg(pmeg);
@@ -21,18 +25,6 @@ prepare_db_meg(pmeg);
 Smeg = [];
 
 pcont = fullfile(pmeg, 'continuous');
-
-% No run directory
-if exist([pcont, filesep, 'raw'], 'dir')
-    % Add paths to continuous dataset 
-    Smeg.continuous.raw = {[pcont, filesep, 'raw']};
-    % Add preproc directory if not done yet
-    Smeg.continuous.prep = {make_dir([pcont, filesep, 'preproc'])};
-    % Add paths to the epoched data
-    Smeg.epoched.run = {make_dir(fullfile(pmeg, 'epoched'))};
-    Smeg.epoched.concat = Smeg.epoched.run{1};
-    return;
-end
 
 % Run directories
 drun = dir([pcont, filesep, 'run_*']);
@@ -43,22 +35,28 @@ end
 
 Nd = length(drun);
 % Initialize data paths
+Smeg.rundir = {drun(:).name}';
+Smeg.Nrun = Nd;
 Smeg.continuous.raw = cell(Nd, 1);
 Smeg.continuous.prep = cell(Nd, 1);
-Smeg.epoched.run = cell(Nd, 1);
+Smeg.epoched.run_dir = cell(Nd, 1);
+Smeg.clean_dir = cell(Nd, 1);
+Smeg.clean_mat = cell(Nd, 1);
 for j = 1 : Nd
     rnam = drun(j).name;
     prun = [pcont, filesep, rnam];
+    praw = [prun, filesep, 'raw'];
+    % Add hdr info
+    add_hdr(praw);
     % Add run directories data paths
-    Smeg.continuous.raw{j} = [prun, filesep, 'raw'];
+    Smeg.continuous.raw{j} = praw;
     Smeg.continuous.prep{j} = make_dir([prun, filesep, 'preproc']);
     % Add paths to the epoched data
-    Smeg.epoched.run{j} = make_dir(fullfile(pmeg, 'epoched', rnam));
-    
+    Smeg.epoched.run_dir{j} = make_dir(fullfile(pmeg, 'epoched', rnam));    
 end
 
-Smeg.epoched.concat = make_dir(fullfile(pmeg, 'epoched', 'run_concat'));
-
+% To see later if necessary (depending on the data processing pipeline)
+% Smeg.epoched.concat = make_dir(fullfile(pmeg, 'epoched', 'run_concat'));
 
 % Check if continuous folder exists
 % If not, try to find raw data in pmeg directory or in subdirectories that will
@@ -85,8 +83,8 @@ pcont = make_dir(pcont);
 % Raw MEG data with no run
 if ~isempty(filepath_raw(pmeg))
         
-    % Move all pmeg content in pmeg / continuous / raw directory
-    praw = make_dir([pcont, filesep, 'raw']);  
+    % Move all pmeg content in pmeg / continuous / run_1 /raw directory
+    praw = make_dir(fullfile(pcont, 'run_1', 'raw'));  
     for i = 1 : Nd
         movefile(pdat{i}, praw);
     end
@@ -140,3 +138,41 @@ if sum(isrun) > 1
     end
 end
 
+% Define the general HDR structure holding general hdr info (as output by ft_read_header) 
+% + events and headshape:
+%- hdr.Fs : sampling frequency in Hz
+%- hdr.grad : grad info
+%- hdr.event : all events found in raw data as returned by ft_read_event
+%- hdr.headshape : headshape as read by ft_read_headshape
+
+function add_hdr(pdir)
+phdr = [pdir, filesep, 'hdr_event.mat'];
+if exist(phdr, 'file')
+    return;
+end
+
+% Raw data path
+praw = filepath_raw(pdir);
+
+% Read general HDR info
+hdr_event = ft_read_header(praw);
+hdr_event.dataset = praw;
+
+% Add events
+hdr_event.event = ft_read_event(praw);
+
+% Add shape if shape file is found (for 4d and neuromag data for now)
+pshape = [];
+if exist([pdir, filesep, 'hs_file'], 'file')
+    pshape = [pdir, filesep, 'hs_file'];
+else
+    [~, ~, ext] = fileparts(praw);
+    if strcmp(ext, '.fif')
+        pshape = praw;
+    end
+end
+if ~isempty(pshape)
+    hdr_event.headshape = ft_read_headshape(pshape);
+end
+
+save(phdr, 'hdr_event');

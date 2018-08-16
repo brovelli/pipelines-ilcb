@@ -59,18 +59,26 @@ dpath.vol = fullfile(pbvm, 'surface_analysis', '*_parcellation.nii.gz');
 dp_bv = bv_datapaths(Sdir);
 
 % Check for transform files + anat files + meg path
-
 Ns = length(dp_bv);
+
+% Initialize waitbar
+wb = waitbar(0, 'Data import...', 'name', 'Data import');
+wb_custcol(wb, [0.6 0 0.8]);
+
 for i = 1 : Ns
     Sbv = dp_bv(i);
 
+    waitbar(i/Ns, wb, ['Data import: ', Sbv.group, ' ', Sbv.subj]);
     % Create subject's folder if doesn't exist yet
     pft_subj = fullfile(Sdir.db_ft, Sbv.proj, Sbv.group, Sbv.subj);
     pft_subj = make_dir(pft_subj);
     
     % Check for required subdirectories in db_ft/PROJ/(group)/SUBJ
-    Sout = make_mdir(pft_subj, {'mri', 'surf', 'tex', 'vol', 'trans', 'meg'});
-
+    Sini = make_mdir(pft_subj, {'anat', 'meg'});
+    Sout = make_mdir(Sini.anat, {'mri', 'surf', 'tex', 'vol', 'trans'});
+    Sout.meg = Sini.meg;
+    
+    
     if isbv
         if isempty(find_files(Sout.mri, [], 0))
             % Import subject's MRI
@@ -103,8 +111,9 @@ for i = 1 : Ns
         prmeg = fullfile(Sdir.db_meg, Sbv.proj, Sbv.group, Sbv.subj);
         copy_meg(prmeg, drun, Sout.meg)
     end
-
 end
+
+close(wb);
 
 % Copy trm files required to apply transformation matrix to initial subject's
 % MRI
@@ -144,14 +153,20 @@ end
 
 function copy_meg(pmeg, drun, pout)
 
-% Case without run folders (only one set of raw data inside pmeg directely)
-if isempty(drun) && ~isempty(filepath_raw(pmeg))   
-    praw = make_dir([pout, filesep, 'continuous', filesep, 'raw']);
-    copyfile([pmeg, filesep, '*'], praw);
+if ~exist(pmeg, 'dir')
+    warning('MEG directory not found:\n%s\n', pmeg);
     return
-else
-    % Try to import run folders
-    drun = '*';
+end
+% Case without run folders (only one set of raw data inside pmeg directly)
+if isempty(drun) 
+    if ~isempty(filepath_raw(pmeg))   
+        praw = make_dir([pout, filesep, 'continuous', filesep, 'run_1', filesep, 'raw']);
+        copyfile([pmeg, filesep, '*'], praw);
+        return
+    else
+        % Try to import run folders
+        drun = '*';
+    end
 end
 
 % Import specific run folders
@@ -179,16 +194,21 @@ Nd = length(prun);
 
 for i = 1 : Nd
     prun_in = [prun{i}, filesep, '*'];
-    [~, dini] = fileparts(prun{i});        
-    if length(dini)<4 || ~strcmp(dini(1:4), 'run_')
-        dout = ['run_', dini];
-    else
-        dout = dini;
-    end
-    prun_out = fullfile(pout, 'continuous', dout, 'raw');
-    if ~exist(prun_out, 'dir')
-        prun_out = make_dir(prun_out);
-        copyfile(prun_in, prun_out);
+    % Import run file only if raw data are found inside
+    %%%% TO DO : add new possible raw data file format in filepath_raw to be
+    %%%% more "open" with other data recording systems
+    if ~isempty(filepath_raw(prun{i}))
+        [~, dini] = fileparts(prun{i});        
+        if length(dini)<4 || ~strcmp(dini(1:4), 'run_')
+            dout = ['run_', dini];
+        else
+            dout = dini;
+        end
+        prun_out = fullfile(pout, 'continuous', dout, 'raw');
+        if ~exist(prun_out, 'dir')
+            prun_out = make_dir(prun_out);
+            copyfile(prun_in, prun_out);
+        end
     end
 end
 
@@ -224,7 +244,7 @@ if isfull
 else 
     % Determine which decimate tex files to associated
     dmsh = dir(pmsh);
-    pfile = [dmsh(1).folder, filesep, dmsh(1).name];
+    pfile = [fileparts(pmsh), filesep, dmsh(1).name];
     ptex = cp_hiphop_tex(pfile);
 end
 copyfile(ptex, Sout.tex); 
@@ -252,13 +272,13 @@ end
 
 % Copy MarsAtlas volume file from BRAINVISA_DATABASE to FIELDTRIP_DATABASE
 function copy_vol(Sbv, pbvin, pout)
-pvol = dir(fullfile(Sbv.dir, pbvin));
-folder  = fileparts(fullfile(Sbv.dir, pbvin));
+pvol = fullfile(Sbv.dir, pbvin);
+dvol = dir(pvol);
 if isempty(pvol)
     warning('\nMRI file not found in BRAINVISA_DATABASE for subject %s\n', Sbv.subj)
     warning('Please copy the required files inside \n%s\n', pout)
-else
-    copyfile(folder, filesep, pvol(1).name], pout)
+else   
+    copyfile([fileparts(pvol), filesep, dvol(1).name], pout)
 end
 
 function Sdir = make_mdir(proot, cdir)

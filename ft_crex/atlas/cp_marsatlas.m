@@ -15,31 +15,31 @@ Np = length(Sdb);
 for i = 1 : Np
     
     % Check if marsatlas already defined
-    if isempty(Sdb(i).atlas)
+    if isempty(Sdb(i).anat.atlas)
         Sdb(i) = prepare_atlas(Sdb(i));
     end     
 end
 
 function dps = prepare_atlas(dps)
-
+dpa = dps.anat;
 %-- Read MarsAtlas surface files from BV/FS pipeline (Left and Right) 
 % + textures information
-masurf = read_mars_surf(dps.surf, dps.tex);
+masurf = read_mars_surf(dpa.surf, dpa.tex);
 % Number of surf files
 Nh = length(masurf);
 
 %-- Read MarsAtlas volume
-pvol = dps.vol{1};
+pvol = dpa.vol{1};
 mavol = read_mars_vol(pvol);
 
 %-- Transformation matrices
 %* to realign surf and vol in subject MRI space
-Meach = loadvar(dps.trans);
+Meach = loadvar(dpa.trans);
 Msu2bv = Meach{1}*Meach{2};
 Mvo2bv = inv(Meach{4}*Meach{3});
 
 %* to realign according to fiducial
-Mreal = loadvar(dps.Mreal);    
+Mreal = loadvar(dpa.Mreal);    
 
 %-- Realign MarsAtlas
 
@@ -62,14 +62,14 @@ marsatlas = [];
 marsatlas.surf = masurf;
 marsatlas.vol = mavol;
 
-patlas = [make_dir([dps.dir, filesep, 'atlas']), filesep, 'marsatlas.mat'];
+patlas = [make_dir([dpa, filesep, 'atlas']), filesep, 'marsatlas.mat'];
 save(patlas, 'marsatlas');
 
-dps.atlas = patlas;
+dps.anat.atlas = patlas;
 
 % Load volume of condution for figure
-if isfield(dps, 'shell') && exist(dps.shell, 'file')
-    shell = loadvar(dps.shell);
+if isfield(dps.fwd, 'shell') && exist(dps.fwd.shell, 'file')
+    shell = loadvar(dps.fwd.shell);
 else
     shell = [];
 end
@@ -81,8 +81,7 @@ pcor = make_dir([dps.dir, filesep, 'coreg']);
 pmeg = dps.meg.continuous.raw{1};
 
 % Check for coregistration of all the things of the universe
-coreg_fig(marsatlas, shell, pmeg, pcor);
-    
+coreg_fig(marsatlas, shell, pmeg, pcor);  
 
 % Figure showing superimposition of marsatlas surface + volume, + head model
 % with MEG sensor
@@ -110,8 +109,8 @@ axis tight
     
 
 % Print
-saveas(gcf, [pfig, filesep, 'marsatlas_surf_shellcond.fig'])
 export_fig([pfig, filesep, 'marsatlas_surf_shellcond.png'], '-m2')
+save_fig([pfig, filesep, 'marsatlas_surf_shellcond.fig'])
 close
 
 % Headmodel, Right MA surface + Left MA volume
@@ -126,8 +125,8 @@ rotate3d off
 title('Click on a MarsAtlas parcel to get its name', 'color', [1 1 1])
 
 % Print
-saveas(gcf, [pfig, filesep, 'marsatlas_surfR_vol_shellcond.fig'])
 export_fig([pfig, filesep, 'marsatlas_surfR_vol_shellcond.png'], '-m2')
+save_fig([pfig, filesep, 'marsatlas_surfR_vol_shellcond.fig'])
 close
 
 % Add the MEG sensors
@@ -151,14 +150,12 @@ opt.newfig = 0;
 % MEG sensors
 plot_megchan(Sgrad)
 
-
 view(160, 10)    
 title('Cliquer sur une parcelle MarsAtlas pour afficher son nom', 'color', [1 1 1])
 
 %- Print
-saveas(gcf, [pfig, filesep, 'marsatlas_surfR_vol_shellcond_megsens.fig'])
 export_fig([pfig, filesep, 'marsatlas_surfR_vol_shellcond_megsens.png'], '-m2')
-
+save_fig([pfig, filesep, 'marsatlas_surfR_vol_shellcond_megsens.fig'])
 
 % Try to add the headshape
 hs = read_headshape(pmeg);
@@ -198,9 +195,8 @@ delete(hleg)
 put_legend([hm ; pnas ; pleft ; pright], {'surf_R', 'shellcond', 'NAS', 'LPA', 'RPA'});
 
 %- Print
-saveas(gcf, [pfig, filesep, 'marsatlas_surfR_vol_shellcond_megsens_fid.fig'])
 export_fig([pfig, filesep, 'marsatlas_surfR_vol_shellcond_megsens_fid.png'], '-m2')
-
+save_fig([pfig, filesep, 'marsatlas_surfR_vol_shellcond_megsens_fid.fig'])
 close
 
 % Add meshes legend
@@ -213,7 +209,7 @@ lg = legend(hdl, names,'location','eastoutside');
 pos = [0.84199 0.60382 0.14519 0.3193]; 
 set(lg, 'position', pos,...
     'interpreter', 'none', 'fontsize', 11,...
-    'EdgeColor', 'none', 'color', [0.98 0.96 0.96], 'autoupdate', 'off')  
+    'EdgeColor', 'none', 'color', [0.98 0.96 0.96])  
 
 % The color rectangles are of type 'patch' and the
 % associated texts of type 'text'.

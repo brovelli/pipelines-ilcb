@@ -7,91 +7,124 @@ function Sdb = cp_fwd_leadfield(Sdb)
 %
 % TO DO : CHECK FOR LEADFIELD normalize parameter
 %
+% See: % http://www.fieldtriptoolbox.org/tutorial/beamformer#compute_lead_field
+%-- About leadfield normalization :
+% "If you are not contrasting the activity of interest against another condition or baseline time-window, 
+% then you may choose to normalize the lead field (cfg.normalize='yes'), which will help control
+% against the power bias towards the center of the head."
+%-- About channel selection:
+% "Sensors MLP31 and MLO12 were removed from the data set. Thus it is 
+% essential to remove these sensors as well when calculating the lead
+% fields."
+% --> MEG data preprocessing must be done before leadfield computation
+% --> the resulting model.mat file is related to the MEG data that will be
+% use for source analysis(cleanTrials.mat). It will be saved at the same
+% location in meg/epoched/run_*/prep_dir (name of prep_dir depends on the
+% filtering options).
+%
 %-CREx180530
+
+%%% TO DO: be sure MEG data are ready (with bad channel selection...)
 
 Np = length(Sdb);
 
+% Initialize waitbar
+wb = waitbar(0, 'Leadfield computation...', 'name', 'Forward model');
+wb_custcol(wb, [0 0.6 0.8]);
 
 for i = 1 : Np
     psubj = Sdb(i);
-    % Check if already done
-
-    if isfield(psubj, 'model') && exist(psubj.model, 'file')
-        % Already done
-        continue
-    end
     
-    % Set forward model for both cortical and subcortical
-    model = set_model(Sdb(i));  
+    % Subject info
+    sinfo = psubj.sinfo;
+    
+    rdir = psubj.meg.rundir;
+    Nr = length(rdir);
+    
+	waitbar(i/Np, wb, ['Leadfield: ', sinfo]);
+    for j = 1 : Nr
+        % Check if computation already done according to MEG data
+        % preprocessing (removing of bad channels)
+        pmod = [psubj.meg.clean_dir{j}, filesep, 'fwd_model.mat'];
+        % Already done
+        if exist(pmod, 'file')
+            Sdb(i).fwd.model_run{j} = pmod;
+            continue
+        end
+        srun = rdir{j};
+        waitbar(i/Np, wb, ['Leadfield: ', sinfo, '--', srun]);
+        % Raw MEG data directory
+        praw = psubj.meg.continuous.raw{j};
+        pmeg = psubj.meg.clean_mat{j};
+        if isempty(pmeg)
+            warning('Preprocessed MEG data required for leadfield computation...')
+            warning('Computation abort for subject %s\n', [sinfo, '--', srun]);
+            continue
+        end
+        % Preproc MEG data directory
+        prep = fileparts(pmeg);
+        % Set forward model for both cortical and subcortical
+        fwd_model = set_model(psubj, praw, prep);  
 
-    % Save model data
-    pfwd = fileparts(Sdb(i).shell);
-    pmod = [pfwd, filesep, 'model.mat']; 
-    save(pmod, 'model')
+        % Save model data
+        pmod = [prep, filesep, 'fwd_model.mat']; 
+        save(pmod, 'fwd_model')
 
-    % Update Sdb paths
-    Sdb(i).model = pmod;
+        % Update Sdb paths
+        Sdb(i).fwd.model_run{j} = pmod;
 
-    % Leadfield matrix figures
-    % Cortical
-    if ~isempty(model.cortical)
-        leadfield_fig(model.cortical.grid, pfwd, 'cortical')
+        % Leadfield matrix figures
+        pso = make_dir([prep, filesep, 'fwd_model']);
+        % Cortical
+        if ~isempty(fwd_model.cortical)
+            leadfield_fig(fwd_model.cortical.grid, pso, 'cortical')
+        end
 
+        % Subcortical
+        if ~isempty(fwd_model.subcortical)
+            leadfield_fig(fwd_model.subcortical.grid, pso, 'subcortical')
+        end
+
+        %-- Figure of model geometry       
+        cp_fwd_model_fig(fwd_model, pso)
     end
-
-    % Subcortical
-    if ~isempty(model.subcortical)
-        leadfield_fig(model.subcortical.grid, pfwd, 'subcortical')
-    end
-
-    %-- Figure of model geometry       
-    cp_fwd_model_fig(model, pfwd)
       
 end
-
+close(wb);
 % Define fwd model for cortical and (or) subcortical sources
 % model.cortical and model.subcortical both with field:
 % - grid: source model with associated leadfield matrices
 % - headmodel: volume of conduction
 % - atlas: atlas information to identify region of each source
-function model = set_model(psubj)
+function model = set_model(psubj, praw, prep)
 %-- Load data
 
 % Conduction volume for figure of coregistration
-pshell = psubj.shell;
+pshell = psubj.fwd.shell;
 volshell = loadvar(pshell);
 
 % Sources (subcortical for now) -- TO DO : LOOP with cortical too
-pso = psubj.sources;
+pso = psubj.fwd.sources;
 sources = loadvar(pso);
 
+% Grad
+hdr = loadvar([praw, filesep, 'hdr_event.mat']);
+Sgrad = hdr.grad;
 
-% Path to raw MEG data %%%% TO DO : to preprocessed / epoched/run_concat
-pmeg = psubj.meg.continuous.raw{1};
-
-%- Looking for the raw MEG data in pmeg directory
-draw = filepath_raw(pmeg);
-
-% Get sensor position
-Sgrad = ft_read_sens(draw);
+% Get the final channel selection according to preproc.mat file associated
+% with the preprpocessing cleanTrials.mat
+preproc = loadvar([prep, filesep, 'preproc.mat']);
+chansel = chan_sel(preproc.rm.sens);
 
 %----
 % Create lead field = forward solution
-
-% Only select MEG label 
-% Sgrad = Strials.(fcond{1}).grad;
-% chanlab = Strials.(fcond{1}).label'; 
-% % ftTuto : "essential to indicate removing sensors when calculating the lead fields"
-% Sgrad = ft_convert_units(Sgrad,'mm');
-%%% TO DO - chansel from preprocessing MEG data !!!
-chansel = ft_channelselection('meg', Sgrad.label);
-
 model = [];
 model.subcortical = prepare_model(sources.subcortical, volshell, Sgrad, chansel);
 model.cortical = prepare_model(sources.cortical, volshell, Sgrad, chansel);
 
 
-
+% Prepare all that is needed for source estimation / beamforming: head
+% model, source point grid and orientation, associated leadfield
 function mdl = prepare_model(grid, shell, grad, chan)
 if isempty(grid)
     mdl = [];
@@ -119,12 +152,6 @@ cfg.reducerank = 2;
 cfg.channel = chan;  
 ldf_grid = ft_prepare_leadfield(cfg);
 
-% Figure showing the leadfield
-
-% cfg.normalize = 'yes';
-% If you are not contrasting the activity of interest against another condition or baseline time-window, 
-% then you may choose to normalize the lead field (cfg.normalize='yes'), which will help control
-% against the power bias towards the center of the head. 
 
 % Keep source label
 mdl = [];
@@ -132,6 +159,7 @@ mdl.grid = ldf_grid;
 mdl.headmodel = shell;
 mdl.atlas = grid.label;
 
+% Figure showing the leadfield
 function leadfield_fig(ldf_grid, pfig, styp)
 
 Nc = length(ldf_grid.label);

@@ -92,7 +92,7 @@ for i = 1 : Nt
         Meach = [];
         return;
     end
-    ptr = [dtr.folder, filesep, dtr(1).name];     
+    ptr = [ptrans, filesep, dtr(1).name];     
         
     fid = fopen(ptr, 'r');
     Cmat = textscan(fid, '%f');
