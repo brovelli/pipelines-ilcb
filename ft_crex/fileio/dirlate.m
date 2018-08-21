@@ -11,6 +11,7 @@ function [pathfile, namefile] = dirlate(path, nam)
 % function "dir". Then, the most recent one will be chosen.
 
 fprintf('Search for : %s\n', nam);
+nam = strrep(nam, '**', '*');
 
 dfile = dir([path,filesep,nam]);
 if ~isempty(dfile)

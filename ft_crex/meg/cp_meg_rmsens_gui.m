@@ -11,6 +11,7 @@ ochan = ft_channelselection('meg', hdr.label);
 
 Ns = length(Sdb);
 
+
 for i = 1 : Ns
     dps = Sdb(i);
     
@@ -34,12 +35,18 @@ for i = 1 : Ns
         if ~Sprep.new_vis(j)
             continue;
         end
+        
         srun = drun{j};
         Spar = Sprep.param_run{j};
         
         rms = Spar.rm.sens;
         
         pfig = Spar.rms_fig;
+        
+        msgbox({'\fontsize{12}Please select the bad channel(s) for subject: ';...
+            ['\fontsize{13}\bf ', idnam, ' -- ', srun]}, 'Bad channels', 'help',...
+            struct('WindowStyle', 'non-modal', 'Interpreter', 'tex'));
+        
         rms = cp_meg_rmsens_spectra(pfig, rms);       
         
         Sdisp.title = {'Bad channel selection' ; [idnam,' -- ', srun]}; 

@@ -11,14 +11,19 @@ function Sdb = cp_marsatlas(Sdb)
 
 % Number of data to process
 Np = length(Sdb);
-
+% Initialize waitbar
+wb = waitbar(0, 'Prepare MRI...', 'name', 'MRI preprocessing');
+wb_custcol(wb, [0 0.6 0.8]);
 for i = 1 : Np
     
     % Check if marsatlas already defined
     if isempty(Sdb(i).anat.atlas)
         Sdb(i) = prepare_atlas(Sdb(i));
-    end     
+    end    
+	waitbar(i/Np, wb, ['MarsAtlas preparation: ', Sdb(i).sinfo]);  	
 end
+close(wb);
+
 
 function dps = prepare_atlas(dps)
 dpa = dps.anat;

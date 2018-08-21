@@ -89,8 +89,9 @@ dps.anat = add_fpath(dps.anat, [pan, 'mri', filesep, 'mri_resl.mat'], 'mri_resl'
 dps.anat = add_fpath(dps.anat, [pan, 'atlas', filesep, 'marsatlas.mat'], 'atlas');
 
 %---- Fwd directories
+dps.fwd = [];
 % Conduction volume
-dps.fwd = add_fpath(dps, [dps.dir, filesep, 'fwd', filesep, 'vol_shell.mat'], 'shell');
+dps.fwd = add_fpath(dps.fwd, [dps.dir, filesep, 'fwd', filesep, 'vol_shell.mat'], 'shell');
 
 % Sources location
 dps.fwd = add_fpath(dps.fwd, [dps.dir, filesep, 'fwd', filesep, 'sources.mat'], 'sources');
