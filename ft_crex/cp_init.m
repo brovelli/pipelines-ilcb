@@ -34,6 +34,7 @@ for i = 1 : Ns
     
     waitbar(i/Ns, wb, ['Data paths: ', dps.sinfo]);
     
+    dps.anat.dir = [dps.dir, filesep, 'anat'];
     dps.anat.trans = prep_trans(dpsi, Sdir);
     % Add mri, surf, vol and tex files paths
     % File expected with extension gii or nii or gz
@@ -112,7 +113,7 @@ ptrans = make_dir([dps.dir, filesep, 'anat', filesep, 'trans']);
 
 % Expected transform mat
 ptr = [ptrans, filesep, 'Mtrans_ref.mat'];
-if ~exist(ptrans, 'file')
+if ~exist(ptr, 'file')
 
     % trm files are expected in standard BV and FS databases according to
     % referential.txt file // IF TRM files are always the same from BV/FS pipeline, 
