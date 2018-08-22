@@ -37,6 +37,7 @@ wb_custcol(wb, [0 0.6 0.8]);
 
 for i = 1 : Ns
     Sprep = Sdb(i).meg.preproc;
+	waitbar(i/Ns, wb, ['ICA: ', Sdb(i).sinfo]);  	
     
     if ~any(Sprep.new_ica)
         continue;
@@ -56,6 +57,7 @@ for i = 1 : Ns
         end
         Spar = Sprep.param_run{j};
         sdir = rdir{j};
+		waitbar(i/Ns, wb, ['ICA: ', sinfo, '--', sdir]); 
         
         % Main directory for figures and ICA
         pica = Spar.dir.ica;      

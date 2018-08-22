@@ -37,7 +37,7 @@ dsources_mm = 5;
 % + We should have a copy of the transformation files inside db_ft/trans
 % directories (no more need of db_brainvisa and db_freesurfer paths)
 
-pdb = ['D:', filesep, 'db_pip_decim_test'];
+pdb = ['F:', filesep, 'db_pip_decim_test'];
 
 Sdir = [];
 
@@ -132,6 +132,9 @@ addpath(genpath('ft_crex'))
 cp_pref
 ft_defaults
 
+if ~exist(pdb, 'dir')
+    error('\nMain database directory doesn''t exist:\n%s\n', pdb)
+end
 % Import all required files in FIELDTRIP_DATABASE
 % if not done yet = files from anatomical preprocessing in Brainvisa/Freesurfer 
 % + raw MEG data
@@ -142,12 +145,16 @@ cp_db_import(Sdir);
 % Get the subjects list to process depending on Sdir information
 Sdb = cp_init(Sdir);
 
-% Prepare single shell volume if not done yet
-% Ask for fid information
-Sdb = cp_fwd_singleshell(Sdb);
+% Prepare MRI for fwd modelling (ask for FID if not found in directory or 
+% in the header of the MRI file)
+Sdb = cp_fwd_mri_prep(Sdb);
 
 % Prepare MEG data for source estimations
 Sdb = cp_meg_prep(Sdb, mopt);
+
+% Prepare single shell volume if not done yet
+% Ask for fid information
+Sdb = cp_fwd_singleshell(Sdb);
 
 % Prepare atlas files (surf + vol)
 Sdb = cp_marsatlas(Sdb);

@@ -25,7 +25,7 @@ isa_t = strcmp(eopt.rm_trials_cond, 'same');
 fica =  opt.continuous.ica.reject;
 for i = 1 : Ns
     Sprep = Sdb(i).meg.preproc;
-    
+    waitbar(i/Ns, wb, ['Bad trials: ', Sdb(i).sinfo]);  	
     if ~any(Sprep.new_rmt)
         continue;
     end
@@ -44,7 +44,9 @@ for i = 1 : Ns
             continue;
         end
         srun = rdir{j};
-        
+		
+        waitbar(i/Ns, wb, ['Bad trials: ',  sinfo, '--', srun]); 
+		
         Spar = Sprep.param_run{j};
         
         % If ICA components are to be rejected, the data version to

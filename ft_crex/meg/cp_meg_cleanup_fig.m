@@ -42,6 +42,7 @@ for i = 1 : Ns
     
     % Subject info
     sinfo = Sdb(i).sinfo;
+	waitbar(i/Ns, wb, ['Extract: ', sinfo]);
     
     % Run directories
     rdir = Sdb(i).meg.rundir;
@@ -53,8 +54,11 @@ for i = 1 : Ns
             continue;
         end
         Spar = Sprep.param_run{j};
-        opt.info = [sinfo, ' --  ', rdir{j}];
-        
+		srun = rdir{j};
+        opt.info = [sinfo, ' --  ', srun];
+		
+        waitbar(i/Ns, wb, ['Extract: ', sinfo, '--', srun]);
+		
         pclean = make_dir(Spar.dir.cleanup);               
         
         %-- Filter (at least HP > 0.5 Hz to remove slow oscillations that can
