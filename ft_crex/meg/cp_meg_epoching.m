@@ -23,7 +23,7 @@ for i = 1 : Ns
     
     % Info for figures (TO DO)
     % Subject info
-    sinfo = dpm.sinfo;
+    sinfo = Sdb(i).sinfo;
     % Run directories
     rdir = dpm.rundir;
     waitbar(i/Ns, wb, ['Epoching: ', sinfo]);

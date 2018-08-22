@@ -245,11 +245,7 @@ pep = Spar.dir.epoched;
 ppr = [pep, filesep, 'preproc.mat'];
 pdat = [pep, filesep, 'cleanTrials.mat'];
 
-if ~exist(ppr, 'file')
-    isep = 1;
-    return;
-end
-if ~exist(pdat, 'file')
+if ~exist(ppr, 'file') || ~exist(pdat, 'file')
     isep = 1;
     return;
 end
