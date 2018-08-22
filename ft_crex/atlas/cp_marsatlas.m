@@ -67,7 +67,7 @@ marsatlas = [];
 marsatlas.surf = masurf;
 marsatlas.vol = mavol;
 
-patlas = [make_dir([dpa, filesep, 'atlas']), filesep, 'marsatlas.mat'];
+patlas = [make_dir([dpa.dir, filesep, 'atlas']), filesep, 'marsatlas.mat'];
 save(patlas, 'marsatlas');
 
 dps.anat.atlas = patlas;

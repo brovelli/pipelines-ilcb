@@ -59,18 +59,19 @@ annotation(gcf,'textbox', 'String', ['Forward model geometry - ', styp],...
     'LineStyle','none','HorizontalAlignment','left',...
     'FitBoxToText','off','Position',[ 0.0172 0.9236 0.9667 0.0661]);
     
-ht = title('Click on source to display its atlas region', 'color', [1 1 1], 'fontsize', 14);
+% ht = title('Click on source to display its atlas region', 'color', [1 1 1], 'fontsize', 14);
 export_fig([pfig, filesep, 'forward_model_', styp, '.png'], '-m2');
-save_fig([pfig, filesep, 'forward_model_', styp, '.fig']) 
+% Too much time consuming to save the figure as FIG file
+% save_fig([pfig, filesep, 'forward_model_', styp, '.fig']) 
 
 % Add MEG channels
-delete(ht)
+% delete(ht)
 Sgrad = modl.grid.cfg.grad;
 plot_megchan(Sgrad)
 view(180, 0)
 
 export_fig([pfig, filesep, 'forward_model_', styp, '_megsens.png'], '-m2');
-save_fig([pfig, filesep, 'forward_model_', styp, '_megsens.fig']) 
+% save_fig([pfig, filesep, 'forward_model_', styp, '_megsens.fig']) 
 close 
 
 % Define the sphere patches at dipole locations 

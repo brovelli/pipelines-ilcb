@@ -191,17 +191,28 @@ j = handles.Srev.irun(isel);
 Sdb(i).meg.preproc.(newnam)(j) = 1;
 prevelm = Sdb(i).meg.preproc.param_run{j}.rm.(rmnam);
 
-function clist = parlist(clist)
+function clist = parlist(clist, flart)
+if nargin < 2
+	flart = 0;
+else
+	flart = 1;
+end
 if isempty(clist)
     clist = 'None';
     return;
 end
-if ~iscell(clist)
-    if length(clist(1,:)) == 2
+if ~iscell(clist)	
+	% Special case for artefacts windows
+    if flart
+		clist = cellstr(num2str(clist));
         clist = cellfun(@(x) add_cro(strjoint(strsplitt(x, ' '), '-')), clist, 'UniformOutput', 0); 
         clist = strjoint(clist, ' ; ');
     else
         % Assume numeric
+		sz = size(clist);
+		if sz(1)==1 && sz(2) >= 2
+			clist = clist';
+		end
         clist = cellstr(num2str(clist));
         clist = cellfun(@(x) strrep(x, ' ', ''), clist, 'UniformOutput', 0);
         clist = strjoint(clist, ', ');
@@ -236,6 +247,6 @@ j = Srev.irun(isel);
 Sdb = handles.Srev.Sdb;
 Srm = Sdb(i).meg.preproc.param_run{j}.rm;
 handles.lablist_rs.String = parlist(Srm.sens);
-handles.lablist_ra.String = parlist(Srm.art);
+handles.lablist_ra.String = parlist(Srm.art, 1);
 handles.lablist_rc.String = parlist(Srm.comp);
 handles.lablist_rt.String = parlist_trials(Srm.trials);

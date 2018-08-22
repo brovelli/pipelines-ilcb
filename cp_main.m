@@ -37,7 +37,7 @@ dsources_mm = 5;
 % + We should have a copy of the transformation files inside db_ft/trans
 % directories (no more need of db_brainvisa and db_freesurfer paths)
 
-pdb = ['F:', filesep, 'db_pip_decim_test'];
+pdb = ['F:', filesep, 'db_pip_decim_test2'];
 
 Sdir = [];
 
