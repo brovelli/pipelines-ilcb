@@ -186,14 +186,14 @@ idtr = [cell2mat(idtr) cell2mat(idcond)];
 function Sprep = merge_badchan(Sprep)
 Nr = length(Sprep.param_run);
 fprintf('\nMerge the bad channels selection of the %d run(s)\n', Nr)
-rms = Sprep.param_run(1).rm.sens;
+rms = Sprep.param_run{1}.rm.sens;
 for j = 2 : Nr
-    rms = unique([rms; Sprep.param_run(j).rm.sens]);
+    rms = unique([rms; Sprep.param_run{j}.rm.sens]);
 end
 write_bad(Sprep.param_txt.rms.allrun, rms, 'sens');
 
 for j = 1 : Nr
-    Sprep.param_run(j).rm.sens = rms;
+    Sprep.param_run{j}.rm.sens = rms;
 end
 
 % Add the bad channels to be removed after the ICA rejection in
@@ -205,8 +205,8 @@ end
 function add_ica_rms(Sprep)
 Nr = length(Sprep.param_run);
 for j = 1 : Nr
-    rms = Sprep.param_run(j).rm.sens;
-    pica = [Sprep.param_run(j).dir.ica, filesep, 'preproc_ica.mat'];
+    rms = Sprep.param_run{j}.rm.sens;
+    pica = [Sprep.param_run{j}.dir.ica, filesep, 'preproc_ica.mat'];
     preproc_ica = loadvar(pica);
     rmsa = setxor(rms, preproc_ica.rms.before);
     preproc_ica.rms.after = unique([preproc_ica.rms.after; rmsa]);

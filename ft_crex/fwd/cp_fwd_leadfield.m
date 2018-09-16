@@ -24,8 +24,6 @@ function Sdb = cp_fwd_leadfield(Sdb)
 %
 %-CREx180530
 
-%%% TO DO: be sure MEG data are ready (with bad channel selection...)
-
 Np = length(Sdb);
 
 % Initialize waitbar
@@ -196,6 +194,8 @@ for i = 1 : Nd
 
     title({'Leadfield matrix';['in ', sdir{i}, '-direction']},...
         'fontsize',12, 'fontweight','normal')
+    ylim([0.5 Nc+0.5])
+    xlim([0.5 Ns+0.5])
 end
 
 colormap(colormap_blue2red)

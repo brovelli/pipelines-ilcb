@@ -131,7 +131,7 @@ dty = 1.5 * vtk;
 isylog = strcmp(get(gca, 'YScale'), 'log');
 isxlog = strcmp(get(gca, 'XScale'), 'log');
 % Set text position from the top (y coordinate)
-if ~isempty(strfind(loc, 'n')) || ~isempty(strfind(loc, 't'))
+if containss(loc, 'n') || containss(loc, 't')
     if isylog
         yt = get(gca, 'YTick');
         cy = yl(2) - diff(yt(end-1:end))/10;

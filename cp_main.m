@@ -145,27 +145,27 @@ cp_db_import(Sdir);
 % Get the subjects list to process depending on Sdir information
 Sdb = cp_init(Sdir);
 
-% Prepare MRI for fwd modelling (ask for FID if not found in directory or 
-% in the header of the MRI file)
-Sdb = cp_fwd_mri_prep(Sdb);
+% % Prepare MRI for fwd modelling (ask for FID if not found in directory or 
+% % in the header of the MRI file)
+% Sdb = cp_fwd_mri_prep(Sdb);
 
 % Prepare MEG data for source estimations
 Sdb = cp_meg_prep(Sdb, mopt);
-
-% Prepare single shell volume if not done yet
-% Ask for fid information
-Sdb = cp_fwd_singleshell(Sdb);
-
-% Prepare atlas files (surf + vol)
-Sdb = cp_marsatlas(Sdb);
-
-% Define sources (for subcortical and cortical parcels) 
-Sdb = cp_fwd_sources(Sdb, dsources_mm);
-
-% Prepare source model including leadfield and head model => for the leadfield
-% computation, we need to have the final CHANNEL selection depending on MEG data
-% processing and of the run (cf. if not the same channel selection / run)
-Sdb = cp_fwd_leadfield(Sdb);  
+% 
+% % Prepare single shell volume if not done yet
+% % Ask for fid information
+% Sdb = cp_fwd_singleshell(Sdb);
+% 
+% % Prepare atlas files (surf + vol)
+% Sdb = cp_marsatlas(Sdb);
+% 
+% % Define sources (for subcortical and cortical parcels) 
+% Sdb = cp_fwd_sources(Sdb, dsources_mm);
+% 
+% % Prepare source model including leadfield and head model => for the leadfield
+% % computation, we need to have the final CHANNEL selection depending on MEG data
+% % processing and of the run (cf. if not the same channel selection / run)
+% Sdb = cp_fwd_leadfield(Sdb);  
 
 %... To be continued...
 % Next step => inverse problem
