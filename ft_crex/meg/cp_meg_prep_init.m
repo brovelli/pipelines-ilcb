@@ -511,9 +511,9 @@ msg_a = warn_msg(crma, 'artefact', swar);
 % Initialize a msgbox
 smsg = [{sinfo}; msg_s ; msg_a];
 if strcmp(swar, 'rem')
-    new_ica = ica_msg_box('Title', 'Parameter change detected', smsg);
+    new_ica = ica_msg_box('Title', 'Parameter change detected', 'string', smsg);
 else
-    new_ica = ica_msg_box_add('Title', 'Parameter change detected', smsg);
+    new_ica = ica_msg_box_add('Title', 'Parameter change detected', 'string', smsg);
 end
 
 function msg = warn_msg(clist, typ, swar)

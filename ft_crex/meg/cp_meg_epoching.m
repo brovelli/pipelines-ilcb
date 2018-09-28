@@ -1,4 +1,6 @@
 function Sdb = cp_meg_epoching(Sdb, opt)
+% Do the final epoching acocrding to the preprocessing options (for cleaning, filtering
+% and/or resampling)
 
 % Continuous data filtering option
 fopt = opt.continuous.filt;
