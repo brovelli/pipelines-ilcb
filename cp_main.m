@@ -20,8 +20,6 @@
 %-- Compute the leadfield:
 %   depending on the MEG channel selection from preprocessed MEG data
 %
-% TO DO: optimize processing time by asking for FID + MEG preprocessing
-% parameters the earliest as possible
 
 %_________INPUTS
 
@@ -32,10 +30,6 @@ dsources_mm = 5;
 
 % The file structure of the database is set here as proposed by Andrea 
 % See database_part directory for illustration
-% At term, we should initialize all data paths with a function
-% ex. : Sdir = cp_init(pdb, proj, subj);
-% + We should have a copy of the transformation files inside db_ft/trans
-% directories (no more need of db_brainvisa and db_freesurfer paths)
 
 pdb = ['F:', filesep, 'db_pip_decim_test2'];
 
@@ -46,9 +40,9 @@ Sdir = [];
 % Database directory names
 % db_brainvisa and db_freesurfer are initially required to initialize the data
 % importation into the FIELDTRIP_DATABASE
-% If data importation was previously done, the BV and FS DATABASE paths will not
-% be used.
-% If the FIELDTRIP_DB doesn't exist yet, it will be created during importation
+% If data importation was previously done, the BV and FS DATABASE paths are not
+% required anymore
+% If the FIELDTRIP_DB doesn't exist yet, it will be created during data importation
 Sdir.db_bv = [pdb, filesep, 'db_brainvisa'];
 Sdir.db_fs = [pdb, filesep, 'db_freesurfer'];
 Sdir.db_ft = [pdb, filesep, 'db_fieldtrip'];
@@ -60,7 +54,7 @@ Sdir.db_meg = [pdb, filesep, 'db_meg'];
 %             - or with jocker 'run_*' => all directory names matching with 'run_*'
 %	- all directories '*'
 %   - empty [] => no run directories
-Sdir.meg_run = {'1', '6'};
+Sdir.meg_run = {'1'};
 
 % Project directory
 Sdir.proj = 'meg_te';
@@ -75,7 +69,7 @@ Sdir.group = [];
 % -- a string with a jocker '*' (ex. 'subj*')
 %   --> all subject directories with matching names are searched inside project directory
 % -- a cell of string: {'subject_01', 'subject_04'} or {'control*', 'patient*'}
-Sdir.subj = 'subject_*';
+Sdir.subj = 'subject_01';
 
 %------------ MEG data processing options
 mopt = [];
@@ -85,7 +79,7 @@ mopt.continuous.filt.fc = [0.5 250];
 
 %- ICA component rejection 
 mopt.continuous.ica.reject = 1;
-mopt.continuous.ica.numcomp = 'all';
+mopt.continuous.ica.numcomp = 'all'; % a number or 'all'
 
 % Remove the same bad channels selection per subject for all run ('same') 
 % or make a channel selection for each run ('each')
@@ -99,13 +93,14 @@ mopt.continuous.rm_sens_run = 'same';
 mopt.epoched.trigfun = 'trigfun_te';
 mopt.epoched.trialfun = 'trialfun_te';
 
-%- Epoching condition if associated epoching intervals (dt_s) are not the
-% same (if empty, all conditions as defined in trigfun will be extracted)
-mopt.epoched.conditions = {'S'; 'A'; 'R'; 'SAR'};
-% Associated epoching times (one row per condition to define different epoching
-% versions / only one row to apply the same epoching interval for all
-% conditions) [prestim poststim] in second with positive values
-mopt.epoched.dt_s = [3 3 ; 3 3; 3 3; 1.5 5];
+%- Epoching condition and associated epoching intervals (dt_s) cell of dimension
+% number_of_condition x 2 with first column = condition names (as defined in
+% trigfun) and second column = associated epoching intervals as a   
+% [prestim postim] vector, in second with positive values 
+mopt.epoched.condition_dts = {'S', [3 3]
+                                'A', [3 3]
+                                'R', [3 3]
+                                'SAR', [1.5 5]};
 
 %%% TO ADD
 % Baseline intervals for each conditions (cf. for study with priming, 
@@ -118,7 +113,7 @@ mopt.epoched.dt_s = [3 3 ; 3 3; 3 3; 1.5 5];
 % mopt.epoched.bsl_dt_s = 
 
 %- Resampling of epoching data
-mopt.epoched.resample_fs = 1000;
+mopt.epoched.resample_fs = 1000; %%%%%% []
 
 % Remove the same bad trials selection per subject for all conditions ('same')
 % or define a bad trials selection for each condition ('each')
@@ -127,14 +122,16 @@ mopt.epoched.rm_trials_cond = 'same';
 % Don't forget to add fieldtrip toolbox (Mars 2018)
 
 %___________________ END OF INPUT
+% Ask for ft_crex toolbok if not presents in current working directory
+ptool = 'ft_crex';
+if ~exist('ft_crex', 'dir')
+    ptool = uigetdir(pwd, 'Select the ft_crex toolbox directory');
+end
+addpath(genpath(ptool))
 
-addpath(genpath('ft_crex'))
 cp_pref
 ft_defaults
 
-if ~exist(pdb, 'dir')
-    error('\nMain database directory doesn''t exist:\n%s\n', pdb)
-end
 % Import all required files in FIELDTRIP_DATABASE
 % if not done yet = files from anatomical preprocessing in Brainvisa/Freesurfer 
 % + raw MEG data
@@ -165,7 +162,7 @@ Sdb = cp_meg_prep(Sdb, mopt);
 % % Prepare source model including leadfield and head model => for the leadfield
 % % computation, we need to have the final CHANNEL selection depending on MEG data
 % % processing and of the run (cf. if not the same channel selection / run)
-% Sdb = cp_fwd_leadfield(Sdb);  
+Sdb = cp_fwd_leadfield(Sdb);  
 
 %... To be continued...
 % Next step => inverse problem

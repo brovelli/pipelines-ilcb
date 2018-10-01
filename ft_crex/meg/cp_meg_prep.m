@@ -106,27 +106,38 @@ opt.continuous = check_opt(opt.continuous, struct('rm_sens_run', 'each'));
 %-- Default for epoching
 opt.epoched = check_opt(opt.epoched, struct('trigfun', [],...
                                     'trialfun', [],...
-                                    'conditions', [],...
-                                    'dt_s', [3 3], ...
+                                    'condition_dts', [],...
                                     'rm_trials_cond', 'each',...
                                     'resample_fs', []));
                                 
 if isempty(opt.epoched.trigfun)
     warning('MEG preprocessing:');
-    warning('opt.trigfun is required to know the marker values to consider for epoching');
+    warning('opt.epoched.trigfun is required to know the marker values to consider for epoching');
     error('Abort processing')
 end
 
+if isempty(opt.epoched.condition_dts)
+    warning('MEG preprocessing:');
+    warning(['opt.epoched.condition_dt is required to know the ',...
+        'conditions to process and the associated epoching intervals']);
+    error('Abort processing')
+end
+
+%-- Check for HP filtering if ICA is required
 fica = opt.continuous.ica.reject;
 fopt = opt.continuous.filt;
 
-% Check for HP filtering if ICA is required
 fc_hp = 0.5;
 if fica
     fopt = check_ica_filt_opt(fopt, fc_hp);
     opt.continuous.filt = fopt;
 end
 
+%-- Option for epoching (unfold condition_dts table)
+opt.epoched.conditions = opt.epoched.condition_dts(:, 1);
+opt.epoched.dt_s = vertcat(opt.epoched.condition_dts{:, 2});
+
+%-- Do processing as long as required (depending on final review changes)
 isval = 0;
 while ~isval    
     Sdb = prep_pipeline(Sdb, opt);
@@ -137,10 +148,16 @@ while ~isval
     isval = cp_meg_review_gui(Sdb, opt);
 end
 
-%---- Do the preprocessing with the requested filtering option and the cleaning
+%-- Do the preprocessing with the requested filtering option and the cleaning
 % paramters
 Sdb = cp_meg_epoching(Sdb, opt);
 
+%%%% TO DO: add the possibility to do beamforming on continuous data (cf.
+%%%% resting state / etc) --> if opt.epoched is empty / or
+%%%% opt.epoched.condition_dts / or an option opt.bmf.continuous = 'yes' ?
+
+%-- Pipeline for preprocessing MEG data (selection of bad channels, bad ICs, bad
+% trials
 function Sdb = prep_pipeline(Sdb, opt)
 
 % Initialize all param_txt files

@@ -64,10 +64,12 @@ if (strcmp(opt.trialfun, 'ft_trialfun_general') == 1)
         'ft_trialfun_general function'])
     end
 end
-cfg.trialdef.eventvalue = opt.trig.value; % Code du type d'evenement considere
+% Trigger codes
+cfg.trialdef.eventvalue = opt.trig.value; 
 cfg.trialdef.prestim    = opt.prestim;
 cfg.trialdef.poststim   = opt.poststim;
-cfg.trialdef.eventtype  = opt.trig.eventyp;  % Name of the trigger channel to extract
+% Name of the trigger channel to extract
+cfg.trialdef.eventtype  = opt.trig.eventyp;  
 cfg.trialdef.resptype  = opt.trig.resptyp;
 
 if isfield(opt.trig,'rightresp') && ~isempty(opt.trig.rightresp)

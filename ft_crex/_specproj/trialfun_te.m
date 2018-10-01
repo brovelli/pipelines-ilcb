@@ -15,7 +15,7 @@ Fs   = cfg.fsample;
 event = cfg.event;
 
 % Find OK events
-event = trial_sar(event, cfg.trialdef.eventvalue);
+[event, tval] = trial_sar(event, cfg.trialdef.eventvalue);
 samples = [event.sample]';
 
 % Determine the number of samples before and after the event
@@ -24,13 +24,20 @@ Npost =  round(cfg.trialdef.poststim * Fs);
 
 Ns = length(samples);
 % trl for trial definition in ft_redefinetrial
-trl = [samples+Npre samples+Npost repmat(Npre, Ns, 1)];
+trl = [samples+Npre samples+Npost repmat(Npre, Ns, 1) tval];
 
 % Valid triggers = the one which are in a 's' 'a' 'r' complete sequence + with a
 % correct response (nor late nor incorrect)
-function event = trial_sar(event, trval)
+function [event, tval] = trial_sar(event, trval)
 
 Strig = trigfun_te;
+
+% Find the associated condition name
+cval = {Strig(:).value};
+icond = cellfun(@(x) all(ismember(trval, x)), cval);
+tfun = Strig(icond).fun;
+
+% Only keep trial with a complete sequence 'S' 'A' 'R'
 cnam = {Strig(:).name}';
 Strig = Strig([find(strcmp(cnam, 'S')) find(strcmp(cnam, 'A')) find(strcmp(cnam, 'R'))]);
 
@@ -72,3 +79,7 @@ Nv = length(trval);
 ind_tr = ind_ok(sum((repmat(val(ind_ok), 1, Nv)==repmat(trval, Ni, 1)), 2) == 1);
 
 event = event(ind_tr);
+
+% At least, keep trigger value column (but with value that is transfomed by
+% Strig(icond).fun anonymous function
+tval = tfun([event.value])';

@@ -15,9 +15,11 @@ for k = 1 : Nc
     trials = cmeg_extract_trials(ftData, allev, eopt);
 
     %-- Resampling   
-    cfg = [];
-    cfg.resamplefs = eopt.res_fs;
-    trials = ft_resampledata(cfg, trials); 
+    if ~isempty(eopt.res_fs)
+        cfg = [];
+        cfg.resamplefs = eopt.res_fs;
+        trials = ft_resampledata(cfg, trials); 
+    end
     allTrials.(cnam) = trials;
 end
 

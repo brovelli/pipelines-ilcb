@@ -104,7 +104,7 @@ for i = 1 : Ns
         cfg = [];
         cfg.method = 'runica'; 
         cfg.demean = 'no';
-        cfg.numcomp = Nc;
+        cfg.numcomponent = Nc;
         comp = ft_componentanalysis(cfg, resData);
         
         opt_ica.savepath = pfig;

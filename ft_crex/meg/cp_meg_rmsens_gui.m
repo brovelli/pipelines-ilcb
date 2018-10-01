@@ -22,7 +22,7 @@ for i = 1 : Ns
     end
     
     idnam = dps.sinfo;
-    
+
     drun = dps.meg.rundir;
     Nr = length(drun);
     disp_subj(dps.info)
@@ -43,8 +43,9 @@ for i = 1 : Ns
         
         pfig = Spar.rms_fig;
         
+        % Avoid latex interpreter bug with prep_tex
         msgbox({'\fontsize{12}Please select the bad channel(s) for subject: ';...
-            ['\fontsize{13}\bf ', idnam, ' -- ', srun]}, 'Bad channels', 'help',...
+            ['\fontsize{13}\bf ', prep_tex([idnam, ' -- ', srun])]}, 'Bad channels', 'help',...
             struct('WindowStyle', 'non-modal', 'Interpreter', 'tex'));
         
         rms = cp_meg_rmsens_spectra(pfig, rms);       

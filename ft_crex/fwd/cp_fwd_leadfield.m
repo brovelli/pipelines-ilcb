@@ -112,6 +112,7 @@ Sgrad = hdr.grad;
 % Get the final channel selection according to preproc.mat file associated
 % with the preprpocessing cleanTrials.mat
 preproc = loadvar([prep, filesep, 'preproc.mat']);
+%%% Only for MEG here !!!
 chansel = chan_sel(preproc.rm.sens);
 
 %----
