@@ -1,10 +1,17 @@
 function isval = cp_meg_review_gui(Sdb, opt)
+% General GUI to review preprocessing parameters
+% Last chance to modify channels / trials to remove
+%-CREx180726
 
 Srev = prepare_list(Sdb);
 Srev.Sdb = Sdb;
 Srev.opt = opt;
+uiwait(msgbox({'\fontsize{12}Please confirm/change preprocessing parameters ';...
+    'before source/connectivity analysis'}, 'Preprocessing review', 'help',...
+    struct('WindowStyle', 'non-modal', 'Interpreter', 'tex')));
 ischg = preproc_review(Srev);
 isval = ~ischg;
+
 function Srev = prepare_list(Sdb)
 Ns = length(Sdb);
 % Id for run number 
@@ -30,3 +37,5 @@ Srev = [];
 Srev.isubj = isubj;
 Srev.irun = irun;
 Srev.slist = dinfo;
+
+

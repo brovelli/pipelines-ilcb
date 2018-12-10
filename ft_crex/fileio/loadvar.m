@@ -9,18 +9,21 @@ function [vval, vname] = loadvar(mpath, svar)
 if nargin < 2
     svar = '*';
 end
+vval = [];
+vname = [];
 
-Smat = load(mpath, svar);
-vnam = fieldnames(Smat);
-if length(vnam) > 1
-    warning('Several variables found in data file %s', mpath)
-    vnam = select_var(mpath, svar, vnam);
+if isempty(mpath)
+    return;
 end
 
-vval = Smat.(vnam{1});
+Smat = load(mpath, svar);
+[vnam, Nv] = get_names(Smat);
+if Nv > 1
+    warning('Several variables found in data file %s', mpath)
+    vnam = select_var(vnam);
+end
 vname = vnam{1};
-
-
+vval = Smat.(vname);
 
 
 function vnam = select_var(vnam)

@@ -43,17 +43,17 @@ for i = 1 : Np
     for j = 1 : Nr
         % Check if computation already done according to MEG data
         % preprocessing (removing of bad channels)
-        pmod = [psubj.meg.clean_dir{j}, filesep, 'fwd_model.mat'];
+        pmod = [psubj.meg.analysis.clean_dir{j}, filesep, 'fwd_model.mat'];
         % Already done
-        if exist(pmod, 'file')
+        if exist(pmod, 'file') && ~psubj.meg.analysis.new_clean(j)
             Sdb(i).fwd.model_run{j} = pmod;
             continue
         end
         srun = rdir{j};
         waitbar(i/Np, wb, ['Leadfield: ', sinfo, '--', srun]);
         % Raw MEG data directory
-        praw = psubj.meg.continuous.raw{j};
-        pmeg = psubj.meg.clean_mat{j};
+        pinfo = psubj.meg.info{j};
+        pmeg = psubj.meg.analysis.clean_mat{j};
         if isempty(pmeg)
             warning('Preprocessed MEG data required for leadfield computation...')
             warning('Computation abort for subject %s\n', [sinfo, '--', srun]);
@@ -62,7 +62,7 @@ for i = 1 : Np
         % Preproc MEG data directory
         prep = fileparts(pmeg);
         % Set forward model for both cortical and subcortical
-        fwd_model = set_model(psubj, praw, prep);  
+        fwd_model = set_model(psubj, pinfo, prep);  
 
         % Save model data
         pmod = [prep, filesep, 'fwd_model.mat']; 
@@ -94,7 +94,7 @@ close(wb);
 % - grid: source model with associated leadfield matrices
 % - headmodel: volume of conduction
 % - atlas: atlas information to identify region of each source
-function model = set_model(psubj, praw, prep)
+function model = set_model(psubj, pinfo, prep)
 %-- Load data
 
 % Conduction volume for figure of coregistration
@@ -106,13 +106,17 @@ pso = psubj.fwd.sources;
 sources = loadvar(pso);
 
 % Grad
-hdr = loadvar([praw, filesep, 'hdr_event.mat']);
+hdr = loadvar([pinfo, filesep, 'hdr_event.mat']);
 Sgrad = hdr.grad;
 
 % Get the final channel selection according to preproc.mat file associated
 % with the preprpocessing cleanTrials.mat
 preproc = loadvar([prep, filesep, 'preproc.mat']);
 %%% Only for MEG here !!!
+%%% TO DO : add label in preproc
+% determine whether the input contains EEG or MEG sensors
+% iseeg = ft_senstype(sens, 'eeg');
+% ismeg = ft_senstype(sens, 'meg');
 chansel = chan_sel(preproc.rm.sens);
 
 %----

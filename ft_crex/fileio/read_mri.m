@@ -12,6 +12,9 @@ end
 if ispc && strcmp(pmri(end-1:end), 'gz')
     ptest = gunzip(pmri);
     pmri = ptest{1};
+    unz = 1;
+else
+    unz = 0;
 end
 
 % ft_tool('freesurfer', 'add');
@@ -26,4 +29,10 @@ mri = ft_read_mri(pmri);
 % Convert units to mri_unit if not set yet or if units are differents
 fprintf('\nSet units in %s\n', mri_unit);  
 mri = ft_convert_units(mri, mri_unit);
+
+% Delete unzip file
+if unz
+    delete(pmri);
+end
+    
 

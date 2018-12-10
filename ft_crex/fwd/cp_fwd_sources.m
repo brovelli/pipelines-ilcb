@@ -203,6 +203,14 @@ function ori = add_normals(mesh)
 mesh.vertices = mesh.pos;
 mesh.faces = mesh.tri;
 ori = patchnormals(mesh);
+isn = isnan(ori(:, 1));
+if any(isn)
+    warning(['Patchnormals function failed to find normals for ',...
+                num2str(sum(isn)), ' vertex - Using fieldtrip normals'])
+    ftnrm = normals(mesh.pos, mesh.tri);
+    ori(isn==1, :) = ftnrm(isn==1, :);
+end
+    
 
 % Define the subcortical sources by using kmeans (euclidean distance) method
 function subcor = set_subsources(atlas, vol_sphere, pfig)
@@ -299,7 +307,7 @@ for i = 1 : Nf
         dati = labinfo.(nam);
         ncol = length(dati(1, :));
         if iscell(dati)
-            Slab.(nam) = cell(Ni, ncol);
+            Slab.(nam) = repmat({''}, Ni, ncol); 
         else
             Slab.(nam) = zeros(Ni, ncol);
         end
@@ -413,10 +421,10 @@ save_fig([pso, filesep, 'sources_all_label.fig'])
 % Add shell
 if ~isempty(pshell)
     vol = loadvar(pshell);
-    vol.name = 'Singleshell';
-    
+     
     opt = [];
     opt.newfig = 0;
+	opt.names = 'Singleshell';
     plot_meshes(vol.bnd, opt);
     
     % Print
@@ -426,7 +434,7 @@ end
 
 % Add MEG sensors if pmeg is valid
 if ~isempty(pmeg)
-    praw = pmeg.continuous.raw{1};
+    praw = pmeg.raw{1};
     draw = filepath_raw(praw);
     if ~isempty(draw)
         % Check reg MEG + vol model only

@@ -36,7 +36,7 @@ wb = waitbar(0, 'Extract continuous data...', 'name', 'MEG preprocessing');
 wb_custcol(wb, [0 0.6 0.8]);
 for i = 1 : Ns
     Sprep = Sdb(i).meg.preproc;
-    if ~any(Sprep.new_vis)
+    if ~any(Sprep.do.rms)
         continue;
     end
     
@@ -50,7 +50,7 @@ for i = 1 : Ns
 
     for j = 1 : Nr
         % If the initial data visualisation was already done
-        if ~Sprep.new_vis(j)
+        if ~Sprep.do.rms(j)
             continue;
         end
         Spar = Sprep.param_run{j};
@@ -59,7 +59,7 @@ for i = 1 : Ns
 		
         waitbar(i/Ns, wb, ['Extract: ', sinfo, '--', srun]);
 		
-        pclean = make_dir(Spar.dir.cleanup);               
+        pclean = make_dir(Spar.dir.cleanup_fig);               
         
         %-- Filter (at least HP > 0.5 Hz to remove slow oscillations that can
         % make artifacts more difficult to see
@@ -88,17 +88,19 @@ for i = 1 : Ns
             %-- Continuous data plot => based on a resampling version of the data to
             % make figure faster   
             pfig_vis = make_dir([pclean, filesep, 'datadisp']); 
-            [Scol, zchan] = cmeg_chancheck_fig(resData, pfig_vis, opt.info);
-
-            %-- Add channel with zeros in bad channels selection
-            Spar.rm.sens = unique([Spar.rm.sens ; zchan]);
-
+            Scol = cmeg_chancheck_fig(resData, pfig_vis, opt.info);
             opt.savepath = pfig_vis;
             opt.colors = Scol;
             cmeg_plot_data(resData, opt)
         end
         
-        fprintf('\n------\nFigures to help for channel selection:\n%s\n-------\n',...
+        % Add channels == 0
+        isz = sum(ftData.trial{1}, 2)==0;
+        zchan = ftData.label(isz);
+        %-- Add channel with zeros in bad channels selection
+        Spar.rm.sens = unique([Spar.rm.sens ; zchan]);
+        
+        fprintf('\n------\nFigures to help for channel selection:\n%s\n-------\n\n',...
             pclean);       
         
         Sdb(i).meg.preproc.param_run{j} = Spar;

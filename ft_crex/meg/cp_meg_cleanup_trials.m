@@ -2,7 +2,7 @@ function Sdb = cp_meg_cleanup_trials(Sdb, opt)
 % To identify bad trials, the filtered version of continuous
 % data is used to extract trial, then resampled at 400 Hz
 %
-%-CREx-180803
+%-CREx180803
 
 opt_tr = [];
 opt_tr.type = 'hp';
@@ -26,7 +26,7 @@ fica =  opt.continuous.ica.reject;
 for i = 1 : Ns
     Sprep = Sdb(i).meg.preproc;
     waitbar(i/Ns, wb, ['Bad trials: ', Sdb(i).sinfo]);  	
-    if ~any(Sprep.new_rmt)
+    if ~any(Sprep.do.rmt)
         continue;
     end
     
@@ -40,7 +40,7 @@ for i = 1 : Ns
     
     for j = 1 : Nr
         % If the initial data visualisation was already done
-        if ~Sprep.new_rmt(j)
+        if ~Sprep.do.rmt(j)
             continue;
         end
         srun = rdir{j};
@@ -104,11 +104,11 @@ for i = 1 : Ns
         % Removing of sensors, artefact and ica components
         preproc_trials.rm = rmfield(Spar.rm, 'trials');
         preproc_trials.Ntr = Ntr;
-        pptr = Spar.dir.trials;
-        save([pptr, filesep, 'preproc_trials.mat'], 'preproc_trials'); 
+        
+        save([Spar.dir.preproc, filesep, 'preproc_trials.mat'], 'preproc_trials'); 
         
         Sprep.param_run{j} = Spar;
-        Sprep.new_rmt(j) = 0;
+        Sprep.do.rmt(j) = 0;
     end
     % Merge the bad channel(s) for all runs
     if any(isbadc) && isa_s

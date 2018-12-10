@@ -85,13 +85,19 @@ function Sdb = cp_meg_prep(Sdb, opt)
 % , rm_sens, rm_comp, 
 %
 %-- TO DO:  - GUI for artefact identification
-%           - frequency analysis at trial level
 % (to be added: - opt.epoched.tshift_s: shift time for triggers)
 %
 %-CREx180726
-
+imeg = is_meg(Sdb);
+if ~any(imeg)
+    return
+else
+    Sdbm = Sdb(imeg);
+end
+%%% TO DO: case where no meg data found
 % Default options
-
+opt = check_opt(opt, struct('continuous', struct('filt', [], 'ica', [], 'rm_sens_run', 'each'),...
+                            'epoched', []));
 %-- Default for continuous dataset
 %- Filtering
 opt.continuous.filt = check_opt(opt.continuous.filt,...
@@ -99,9 +105,6 @@ opt.continuous.filt = check_opt(opt.continuous.filt,...
 %- ICA
 opt.continuous.ica = check_opt(opt.continuous.ica,...
                         struct('reject', 0, 'numcomp', 'all'));
-                    
-%- RM sensor mode 
-opt.continuous = check_opt(opt.continuous, struct('rm_sens_run', 'each'));
 
 %-- Default for epoching
 opt.epoched = check_opt(opt.epoched, struct('trigfun', [],...
@@ -140,17 +143,19 @@ opt.epoched.dt_s = vertcat(opt.epoched.condition_dts{:, 2});
 %-- Do processing as long as required (depending on final review changes)
 isval = 0;
 while ~isval    
-    Sdb = prep_pipeline(Sdb, opt);
+    Sdbm = prep_pipeline(Sdbm, opt);
     % Final review
     %---- Confirm a last time all the preprocessing parameters for all subjects (if
     % any change in parameters, write the new one in txt file and launch the
     % prep_pipeline
-    isval = cp_meg_review_gui(Sdb, opt);
+    isval = cp_meg_review_gui(Sdbm, opt);
 end
 
 %-- Do the preprocessing with the requested filtering option and the cleaning
 % paramters
-Sdb = cp_meg_epoching(Sdb, opt);
+Sdbm = cp_meg_epoching(Sdbm, opt);
+
+Sdb(imeg) = Sdbm;
 
 %%%% TO DO: add the possibility to do beamforming on continuous data (cf.
 %%%% resting state / etc) --> if opt.epoched is empty / or

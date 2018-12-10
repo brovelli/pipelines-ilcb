@@ -39,7 +39,7 @@ for i = 1 : Ns
     Sprep = Sdb(i).meg.preproc;
 	waitbar(i/Ns, wb, ['ICA: ', Sdb(i).sinfo]);  	
     
-    if ~any(Sprep.new_ica)
+    if ~any(Sprep.do.ica)
         continue;
     end
     
@@ -52,7 +52,7 @@ for i = 1 : Ns
 
     for j = 1 : Nr
         % If the initial data visualisation was already done
-        if ~Sprep.new_ica(j)
+        if ~Sprep.do.ica(j)
             continue;
         end
         Spar = Sprep.param_run{j};

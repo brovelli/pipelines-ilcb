@@ -11,7 +11,7 @@ for i = 1 : Ns
     
     Sprep = dps.meg.preproc;
     % If the initial data visualisation was already done
-    if ~any(Sprep.new_rmt)
+    if ~any(Sprep.do.rmt)
         continue;
     end
     
@@ -19,14 +19,13 @@ for i = 1 : Ns
     
     drun = dps.meg.rundir;
     Nr = length(drun);
-    disp_subj(dps)
     
     Sdisp = [];
     %-- Interactive figure of spectra / channels to make a first selection of
     % bad channels - for each run (depending on rm_sens_run option, all bad
     % channels will be merged for all runs (case=='same')
     for j = 1 : Nr
-        if ~Sprep.new_rmt(j)
+        if ~Sprep.do.rmt(j)
             continue;
         end
         srun = drun{j};
@@ -36,6 +35,11 @@ for i = 1 : Ns
         Str = Spar.rm.trials;
         
         [cond, Nc] = get_names(Str);
+        
+        uiwait(msgbox({'\fontsize{12}Please select the bad trials(s) for subject: ';...
+        ['\fontsize{13}\bf ', prep_tex([idnam, ' -- ', srun])]}, 'Bad trials', 'help',...
+        struct('WindowStyle', 'non-modal', 'Interpreter', 'tex')));
+        
         for k = 1 : Nc
             cnam = cond{k};
             Ntr = Spar.Ntr.(cnam);
@@ -55,7 +59,7 @@ for i = 1 : Ns
 
             % Figures directory
             Sdisp.dir = [];
-
+        
             rmt = preproc_select(Sdisp);
             Spar.rm.trials.(cnam) = rmt';
 
@@ -64,17 +68,9 @@ for i = 1 : Ns
         end
         
         Sprep.param_run{j} = Spar;
-        Sprep.new_rmt(j) = 0;
+        Sprep.do.rmt(j) = 0;
     end
     
     % Merge the bad channel(s) already identified (== those with signal == 0)
     Sdb(i).meg.preproc = Sprep;
 end
-
-function disp_subj(dps, rdir)
-if nargin < 2
-    rdir = [];
-end
-sep = '---------------------------------';
-idnam = [dps.proj, ' ', dps.group, ' ', dps.subj, ' ', rdir];
-fprintf('\n\n%s\n   %s\n%s\n\n', sep, idnam, sep);

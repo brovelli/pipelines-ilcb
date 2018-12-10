@@ -6,7 +6,7 @@ function Sdb = cp_meg_rmsens_gui(Sdb, copt)
 
 isa_s = strcmp(copt.rm_sens_run, 'same');
 % Get the original MEG channel list once
-hdr = loadvar([Sdb(1).meg.continuous.raw{1}, filesep, 'hdr_event']);
+hdr = loadvar([Sdb(1).meg.info{1}, filesep, 'hdr_event']);
 ochan = ft_channelselection('meg', hdr.label);
 
 Ns = length(Sdb);
@@ -17,7 +17,7 @@ for i = 1 : Ns
     
     Sprep = dps.meg.preproc;
     % If the initial data visualisation was already done
-    if ~any(Sprep.new_vis)
+    if ~any(Sprep.do.rms)
         continue;
     end
     
@@ -32,11 +32,12 @@ for i = 1 : Ns
     % bad channels - for each run (depending on rm_sens_run option, all bad
     % channels will be merged for all runs (case=='same')
     for j = 1 : Nr
-        if ~Sprep.new_vis(j)
+        if ~Sprep.do.rms(j)
             continue;
         end
         
         srun = drun{j};
+        sinfo = [idnam, ' -- ', srun];
         Spar = Sprep.param_run{j};
         
         rms = Spar.rm.sens;
@@ -44,13 +45,13 @@ for i = 1 : Ns
         pfig = Spar.rms_fig;
         
         % Avoid latex interpreter bug with prep_tex
-        msgbox({'\fontsize{12}Please select the bad channel(s) for subject: ';...
-            ['\fontsize{13}\bf ', prep_tex([idnam, ' -- ', srun])]}, 'Bad channels', 'help',...
-            struct('WindowStyle', 'non-modal', 'Interpreter', 'tex'));
+        uiwait(msgbox({'\fontsize{12}Please select the bad channel(s) for subject: ';...
+            ['\fontsize{13}\bf ', prep_tex(sinfo)]}, 'Bad spectra', 'help',...
+            struct('WindowStyle', 'non-modal', 'Interpreter', 'tex')));
         
         rms = cp_meg_rmsens_spectra(pfig, rms);       
         
-        Sdisp.title = {'Bad channel selection' ; [idnam,' -- ', srun]}; 
+        Sdisp.title = {'Bad channel selection' ; sinfo}; 
         
         % Good channels
         gchan = setxor(ochan, rms);
@@ -60,7 +61,7 @@ for i = 1 : Ns
         Sdisp.bad.clist = rms;  
         
         % Figures directory
-        Sdisp.dir = Spar.dir.cleanup;
+        Sdisp.dir = Spar.dir.cleanup_fig;
         
         rms = preproc_select(Sdisp);
         Spar.rm.sens = rms;
@@ -68,7 +69,7 @@ for i = 1 : Ns
         % Write rms
         write_bad(Sprep.param_txt.rms.(srun), rms, 'sens')
         Sprep.param_run{j} = Spar;
-        Sprep.new_vis(j) = 0;
+        Sprep.do.rms(j) = 0;
     end
     
     % Merge the bad channel(s) already identified (== those with signal == 0)

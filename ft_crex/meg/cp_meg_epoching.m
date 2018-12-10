@@ -1,6 +1,7 @@
 function Sdb = cp_meg_epoching(Sdb, opt)
 % Do the final epoching acocrding to the preprocessing options (for cleaning, filtering
 % and/or resampling)
+%-CREx180726
 
 % Continuous data filtering option
 fopt = opt.continuous.filt;
@@ -19,7 +20,7 @@ for i = 1 : Ns
     dpm = Sdb(i).meg;
     Sprep = dpm.preproc;
     
-    if ~any(Sprep.new_epch)
+    if ~any(Sprep.do.epch)
         continue;
     end
     
@@ -31,7 +32,7 @@ for i = 1 : Ns
     waitbar(i/Ns, wb, ['Epoching: ', sinfo]);
     for j = 1 : dpm.Nrun
         % If the initial data visualisation was already done
-        if ~Sprep.new_epch(j)
+        if ~Sprep.do.epch(j)
             continue;
         end
 		
@@ -47,8 +48,8 @@ for i = 1 : Ns
         allTrials = extract_trials(ftData, Spar, eopt);
         
         % Remove bad trials
-        cond = fieldnames(allTrials);
-        Nc = length(cond);
+        [cond, Nc] = get_names(allTrials);
+        
         cleanTrials = allTrials;
         
         % Remove bad trials / conditions
@@ -71,7 +72,7 @@ for i = 1 : Ns
             cfg.trials = igoodt;
             cleanTrials.(cnam) = ft_redefinetrial(cfg, trials);
         end
-        pclean = dpm.clean_dir{j};    
+        pclean = dpm.analysis.clean_dir{j};    
         pmat = [pclean, filesep, 'cleanTrials.mat'];
         save(pmat, '-v7.3', 'cleanTrials');
         
@@ -80,7 +81,7 @@ for i = 1 : Ns
         preproc.rm = Spar.rm;
         save(ppr, 'preproc');
         
-        Sdb(i).meg.clean_mat{j} = pmat;
+        Sdb(i).meg.analysis.clean_mat{j} = pmat;
     end
 end
 close(wb);
