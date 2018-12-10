@@ -121,7 +121,7 @@ function but_rs_Callback(hObject, eventdata, handles) %#ok
 % hObject    handle to but_rs (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-[Sdb, prevs] = set_new(handles, 'new_vis', 'sens');
+[Sdb, prevs] = set_new(handles, 'rms', 'sens');
 handles.Srev.Sdb = cp_meg_rmsens_gui(Sdb, handles.Srev.opt.continuous);
 handles = compare_aft(handles, 'sens', prevs);
 % Update handles structure
@@ -140,7 +140,7 @@ function but_rc_Callback(hObject, eventdata, handles) %#ok
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-[Sdb, prevc] = set_new(handles, 'new_ica', 'comp');
+[Sdb, prevc] = set_new(handles, 'ica', 'comp');
 handles.Srev.Sdb = cp_meg_rmcomp_gui(Sdb);
 handles = compare_aft(handles, 'comp', prevc);
 
@@ -153,7 +153,7 @@ function but_rt_Callback(hObject, eventdata, handles) %#ok
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-[Sdb, prevt] = set_new(handles, 'new_rmt', 'trials');
+[Sdb, prevt] = set_new(handles, 'rmt', 'trials');
 handles.Srev.Sdb = cp_meg_rmtrials_gui(Sdb);
 handles = compare_aft(handles, 'trials', prevt);
 
@@ -188,14 +188,12 @@ Sdb = handles.Srev.Sdb;
 isel = handles.isel;
 i = handles.Srev.isubj(isel);
 j = handles.Srev.irun(isel);
-Sdb(i).meg.preproc.(newnam)(j) = 1;
+Sdb(i).meg.preproc.do.(newnam)(j) = 1;
 prevelm = Sdb(i).meg.preproc.param_run{j}.rm.(rmnam);
 
 function clist = parlist(clist, flart)
 if nargin < 2
 	flart = 0;
-else
-	flart = 1;
 end
 if isempty(clist)
     clist = 'None';

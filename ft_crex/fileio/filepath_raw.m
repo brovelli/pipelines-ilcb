@@ -23,7 +23,6 @@ function pdat = filepath_raw(dirpath, dtyp)
 %
 %______
 %-CREx 20131030 
-%-CREx-BLRI-AMU project: https://github.com/blri/CREx_MEG/fieldtrip_process
 
 fprintf('\n-----\nLooking for raw data set in %s\n', dirpath);
 

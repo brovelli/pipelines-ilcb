@@ -83,7 +83,11 @@ end
 pcor = make_dir([dps.dir, filesep, 'coreg']);
 
 % Neeed for raw MEG data file to superimpose sensors
-pmeg = dps.meg.continuous.raw{1};
+if ~isempty(dps.meg)
+    pmeg = dps.meg.raw{1};
+else
+    pmeg = [];
+end
 
 % Check for coregistration of all the things of the universe
 coreg_fig(marsatlas, shell, pmeg, pcor);  

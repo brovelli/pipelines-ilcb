@@ -7,11 +7,13 @@ function cp_fwd_model_fig(model, pfig)
 %-CREx180704
 %
 
-if ~isempty(model.subcortical)
+if ~isempty(model.subcortical) &&...
+        isempty(dir([pfig, fsep, 'forward*_subcortical*.png']))
     plot_geom(model.subcortical, pfig, 'subcortical')
 end
 
-if ~isempty(model.cortical)
+if ~isempty(model.cortical) &&...
+        isempty(dir([pfig, fsep, 'forward*_cortical*.png']))
     plot_geom(model.cortical, pfig, 'cortical')
 end
 
@@ -73,37 +75,3 @@ view(180, 0)
 export_fig([pfig, filesep, 'forward_model_', styp, '_megsens.png'], '-m2');
 % save_fig([pfig, filesep, 'forward_model_', styp, '_megsens.fig']) 
 close 
-
-% Define the sphere patches at dipole locations 
-function Sbals = dipole_spheres(dip_pos, lab, radius, col)
-
-Ndip = length(dip_pos);
-
-%----
-% Set dipoles spheres
-[Xsph, Ysph, Zsph] = sphere(10); 
-% Unit sphere with N=42 faces - Xb, Yb and Zb are (N+1) x (N+1) matrices
-% using by surf(Xb, Yb, Zb) to draw the sphere
-% Set radius of sphere representing dipoles = 6 mm
-
-Xb = Xsph.* radius;
-Yb = Ysph.* radius;
-Zb = Zsph.* radius;
-
-%----
-% Define dipoles patch balls properties
-
-Sbals = struct;
-for n = 1: Ndip 
-
-    % Coordinates of the center
-    cx = Xb + dip_pos(n, 1);
-    cy = Yb + dip_pos(n, 2);
-    cz = Zb + dip_pos(n, 3);
-
-    [Sbals(n).faces, Sbals(n).vertices] = surf2patch(cx, cy , cz );   
-    Sbals(n).facecolor = col;
-    Sbals(n).edgecolor = 'none';
-    Sbals(n).facelighting = 'gouraud';
-    Sbals(n).displayname = lab{n};
-end

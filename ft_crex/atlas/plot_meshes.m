@@ -15,9 +15,10 @@ function [hp, hleg, hnorm] = plot_meshes(meshes, opt)
 %
 %   - normals (can be 'ori', 'mom', 'norm' or 'normals')
 %   - name: name of the mesh
-%   - color: color to display the mesh [ 1 x 3 vector ]
-% 
-%
+%   - color or edgecolor : color to display the mesh edges [ 1 x 3 vector ]
+%   - facecolor: specific face color [ default: [0.95 0.90 0.80] ]
+%   - facealpha
+%   
 % -- opt: structure of options with fields
 %
 %   - newfig: flag to indicate to generate of new figure for plotting the meshes 
@@ -54,33 +55,46 @@ meshes = meshes(~cellfun(@isempty, meshes));
 Nm = length(meshes);
 
 % Set default
-dopt = struct('newfig', 1, 'dispnorm', 0, 'colors', [], 'names', [], 'visible', 'on');
+dopt = struct('newfig', 1,...
+            'dispnorm', 0,...
+            'colors', [],...
+            'facecolor', [],...
+            'facealpha', [],...
+            'edgecolor', [],...
+            'edgealpha', [],... 
+            'names', [],...
+            'visible', 'on');
+
 if nargin < 2
     opt = dopt;
 else
     opt = check_opt(opt, dopt);
 end
 
-% Default colors
-if isempty(opt.colors)
-    opt.colors = color_group(Nm);
-    fcol = 0;
-else
-    % Force color to be the one set in opt.col even if a mesh.color field is
-    % found
-    fcol = 1;
-end
-
-if isempty(opt.names)
-    opt.names = default_names(Nm);
-    fnam = 0;
-else
-    fnam = 1;
+if ~isempty(opt.colors) && isempty(opt.edgecolor)
+    opt.edgecolor = opt.colors;
 end
 
 if ischar(opt.names)
     opt.names = {opt.names};
 end
+opt.name = opt.names;
+
+% Case for 'none'
+if ischar(opt.facecolor)
+    opt.facecolor = {opt.facecolor};
+end
+if ischar(opt.edgecolor)
+    opt.edgecolor = {opt.edgecolor};
+end
+% Default appearence for meshes: colors, aplphas, names
+mopt = [];
+mopt.facealpha = repmat(0.15, Nm, 1);
+mopt.facecolor = repmat([0.95 0.90 0.80], Nm, 1);
+mopt.edgecolor = color_group(Nm);
+mopt.edgealpha = repmat(0.2, Nm, 1);
+mopt.name = default_names(Nm);
+meshes = set_colors(meshes, opt, mopt);
 
 if opt.newfig
     figure
@@ -95,12 +109,13 @@ names = cell(Nm, 1);
 g = 1;
 for i = 1 : Nm
     % Prepare mesh: identify vertices and faces fields, set color and name 
-    mesh = prep_patch(meshes{i}, opt.names{i}, fnam, opt.colors(i, :), fcol);
+    mesh = prep_patch(meshes{i});
     if ~isempty(mesh.faces) && ~isempty(mesh.vertices)
-        hp(g) = patch('faces', mesh.faces, 'vertices', mesh.vertices, 'edgecolor', mesh.color, 'edgealpha', 0.2, 'facecolor', [0.95 0.90 0.80],...
-            'facealpha', 0.15, 'facelighting','gouraud', 'pickableparts', 'none'); 
+        hp(g) = patch('faces', mesh.faces, 'vertices', mesh.vertices,...
+            'edgecolor', mesh.edgecolor, 'edgealpha', mesh.edgealpha, 'facecolor', mesh.facecolor,...
+            'facealpha', mesh.facealpha, 'facelighting','gouraud', 'pickableparts', 'none'); 
         if opt.dispnorm 
-            hnorm = add_norm(mesh.vertices, mesh.norm, mesh.color);    
+            hnorm = add_norm(mesh.vertices, mesh.norm, mesh.edgecolor);    
         end
         names{g} = mesh.name;
         g = g + 1;
@@ -175,12 +190,18 @@ for i = 1 : N
 end
 
 % Prepare mesh data for plotting
-function meshp = prep_patch(mesh, dname, fn, dcol, fc)
-% Keep initial mesh
-meshi = mesh;
+function mesh = prep_patch(mesh)
+
 % renamefields = fieldtrip function
 if isfield(mesh, 'bnd')
-    mesh = mesh.bnd;
+    bmesh = mesh.bnd;
+    if isstruct(bmesh)
+        fd = fieldnames(bmesh);
+        Nf = length(fd);
+        for i = 1 : Nf
+            mesh.(fd{i}) = bmesh.(fd{i});
+        end
+    end
 end
 if ~isfield(mesh, 'faces') 
     if isfield(mesh, 'tri')
@@ -200,30 +221,55 @@ if ~isfield(mesh, 'vertices')
     end
 end
 
-% Set the prepare mesh structure
-meshp = [];
-meshp.faces = mesh.faces;
-meshp.vertices = mesh.vertices;
-meshp.norm = [];
-
 % Possible field name for normals
 fori = {'normals', 'mom', 'ori', 'norm'};
 fnam = fieldnames(mesh);
 isori = ismember(fori, fnam);
 if any(isori)
-    meshp.norm = mesh.(fori{find(isori==1, 1, 'first')});
+    mesh.norm = mesh.(fori{find(isori==1, 1, 'first')});
 end
+    
+function meshes = set_colors(meshes, opt, mopt)
+% Check each values - priority to opt parameters (even if mesh is holding the
+% color field)
+Nm = length(meshes);
 
-if ~fn && isfield(meshi, 'name')
-    meshp.name = meshi.name;
-else
-    meshp.name = dname;       
-end
+[onames, Nc] = get_names(mopt);
 
-if ~fc && isfield(meshi, 'color')
-    meshp.color = meshi.color;
-else
-    meshp.color = dcol;
+for i = 1 : Nm
+    msh = meshes{i};
+    for j = 1 : Nc
+        onam = onames{j};
+        if ~isempty(opt.(onam))
+            ov = opt.(onam);
+            
+            if length(ov)==Nm || length(ov(:, 1))==Nm
+                if iscell(ov)
+                    msh.(onam) = ov{i};
+                else
+                    msh.(onam) = ov(i, :);
+                end
+            else
+                if iscell(ov)
+                    msh.(onam) = ov{1};
+                else
+                    msh.(onam) = ov;
+                end
+            end
+        else
+            if ~isfield(msh, onam)
+                oval = mopt.(onam);
+                if iscell(oval)
+                    ovals = oval{i};
+                else
+                    ovals = oval(i, :);
+                end
+                msh.(onam) = ovals;
+            end
+        end
+    end
+    meshes{i} = msh;
 end
+        
     
 

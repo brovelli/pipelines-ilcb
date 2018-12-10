@@ -9,23 +9,23 @@ function Sdb = cp_init(Sdir)
 % Prepare Mtrans_ref transformation matrix according to referencial.txt file
 % for atlas surf and vol realignment
 %
-%-CREx180530
+%-CREx-180530
 
 % Check for required files in databases
 Sdp = struct('iproc', [], 'group', []);
 Sdir = check_opt(Sdir, Sdp);
 
 % Define all datapaths from ft database
-dp_meg = meg_datapaths(Sdir);
+dp_ft = db_datapaths(Sdir);
 
 % Check for transform files + anat files + meg path
-Ns = length(dp_meg);
+Ns = length(dp_ft);
 
 % Initialize waitbar
 wb = waitbar(0, 'Check for fieldtrip database...', 'name', 'Initializing data paths');
 wb_custcol(wb, [0.6 0 0.8]);
 for i = 1 : Ns
-    dpsi = dp_meg(i);
+    dpsi = dp_ft(i);
     
     dps = [];
     dps.dir = dpsi.dir;
@@ -45,10 +45,13 @@ for i = 1 : Ns
     dps = add_mat(dps);
     
     % Expected MEG data directory
-    % Check for raw data ==> create grad.mat, hs.mat and event.mat for coreg
-    % figures + the raw meg datapath list + the continuous + epoched that is
-    % concat
-    dps.meg = cp_db_megpaths(make_dir([dps.dir, filesep, 'meg']));
+    % Check for raw data ==> create hdr_event.mat for coregistration figures 
+    % + the raw and preprocessed meg datapath list
+    % Raw data path
+    prmeg = fullfile(Sdir.db_meg, dpsi.proj, dpsi.group, dpsi.subj);
+    % Return empty if meg data are not found (not ready for analysis whereas
+    % anat file are)    
+    dps.meg = cp_db_megpaths(prmeg, [dps.dir, filesep, 'meg'], Sdir.meg_run);
     
     % Initialize fwd model mat paths
     dps.fwd.model_run = cell(dps.meg.Nrun, 1);
@@ -69,7 +72,11 @@ dps.anat.surf = find_files([dpa, 'surf']);
 dps.anat.tex = find_files([dpa, 'tex']);
 dps.anat.vol = find_files([dpa, 'vol']);
 pmri = find_files([dpa, 'mri']);
-dps.anat.mri = pmri{1};
+if ~isempty(pmri)
+    dps.anat.mri = pmri{1};
+else
+    dps.anat.mri = [];
+end
 
 function dps = add_mat(dps)
 % Add already processed file if exist
@@ -130,22 +137,22 @@ if ~exist(ptr, 'file')
     end
 end
 
-% Find all directories for MEG data processing
-function dp = meg_datapaths(Sdir)
+% Find all directories available for pipeline processing
+function dp = db_datapaths(Sdir)
 
 % Main database directory
 db_dir = Sdir.db_ft;
 
 % Add group level directory if Sdir.group is not empty
 if ~isempty(Sdir.group)
-    cpmeg = {db_dir, 0
+    cpft = {db_dir, 0
         Sdir.proj, 0
         Sdir.group, 0
         Sdir.subj, 1};
     igrp = 3;
     isubj = 4;
 else
-    cpmeg = {db_dir, 0
+    cpft = {db_dir, 0
         Sdir.proj, 0
         Sdir.subj, 1};
     isubj = 3;
@@ -153,7 +160,7 @@ else
 end
 iproj = 2;
 
-[alldp, subj, grp, prj] = define_datapaths(cpmeg, isubj, igrp, iproj);
+[alldp, subj, grp, prj] = define_datapaths(cpft, isubj, igrp, iproj);
 
 dp = cell2struct([alldp'; subj'; grp'; prj'], {'dir', 'subj', 'group', 'proj'});
 

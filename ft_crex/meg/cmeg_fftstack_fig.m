@@ -112,7 +112,7 @@ pfig = [psav, filesep, 'fftstack_interact.fig'];
 save_fig(pfig)
 close
 
-fprintf('\nFigure of stacked spectrum saved in ---\n----> %s\n', psav);
+fprintf('\nFigure of stacked spectrum saved in ---\n----> %s\n\n', psav);
 
 % Prepare the template to select bad channels
 function add_buttons(zlab)

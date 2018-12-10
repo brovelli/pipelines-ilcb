@@ -11,7 +11,7 @@ for i = 1 : Ns
     
     Sprep = dps.meg.preproc;
     % If the initial data visualisation was already done
-    if ~any(Sprep.new_ica)
+    if ~any(Sprep.do.ica)
         continue;
     end
     
@@ -26,7 +26,7 @@ for i = 1 : Ns
     % bad channels - for each run (depending on rm_sens_run option, all bad
     % channels will be merged for all runs (case=='same')
     for j = 1 : Nr
-        if ~Sprep.new_ica(j)
+        if ~Sprep.do.ica(j)
             continue;
         end
         srun = drun{j};
@@ -39,8 +39,8 @@ for i = 1 : Ns
 
         pfig = [pica, filesep, 'ica_fig'];     
         
-        Sdisp.title = {'Bad ICA component selection' ; [idnam,' -- ', srun]};         
-        
+        Sdisp.title = {'Bad ICA component selection' ; [idnam,' -- ', srun]};    
+    
         % Good channels
         Ncomp = Spar.Ncomp;
         Sdisp.good.clist = (1 : Ncomp)';
@@ -51,6 +51,10 @@ for i = 1 : Ns
         % Figures directory
         Sdisp.dir = pfig;
         
+        uiwait(msgbox({'\fontsize{12}Please select the bad component(s) for subject: ';...
+        ['\fontsize{13}\bf ', prep_tex([idnam, ' -- ', srun])]}, 'Bad components', 'help',...
+        struct('WindowStyle', 'non-modal', 'Interpreter', 'tex')));
+    
         rmc = preproc_select(Sdisp);
         Spar.rm.comp = rmc';
         
@@ -58,7 +62,7 @@ for i = 1 : Ns
         write_bad(Sprep.param_txt.rmc.(srun), rmc, 'comp')
         
         Sprep.param_run{j} = Spar;
-        Sprep.new_ica(j) = 0;
+        Sprep.do.ica(j) = 0;
     end
     
     % Merge the bad channel(s) already identified (== those with signal == 0)

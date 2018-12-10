@@ -21,7 +21,7 @@
 %   depending on the MEG channel selection from preprocessed MEG data
 %
 
-%_________INPUTS
+%_________________________ INPUTS
 
 % Distance between sources in subcortical regions
 dsources_mm = 5;
@@ -45,16 +45,16 @@ Sdir = [];
 % If the FIELDTRIP_DB doesn't exist yet, it will be created during data importation
 Sdir.db_bv = [pdb, filesep, 'db_brainvisa'];
 Sdir.db_fs = [pdb, filesep, 'db_freesurfer'];
-Sdir.db_ft = [pdb, filesep, 'db_fieldtrip'];
+Sdir.db_ft = [pdb, filesep, 'db_fieldtrip3'];
 Sdir.db_meg = [pdb, filesep, 'db_meg'];
 
-% Run directories to copy inside db_ft/PROJ/(group)/SUBJ/meg directory
+% Run directories to find raw data in db_meg
 %	- a list of directories to import 
 %       ex. : - {'1', '3'} 
 %             - or with jocker 'run_*' => all directory names matching with 'run_*'
 %	- all directories '*'
 %   - empty [] => no run directories
-Sdir.meg_run = {'1'};
+Sdir.meg_run = {'1', '6'};
 
 % Project directory
 Sdir.proj = 'meg_te';
@@ -69,13 +69,13 @@ Sdir.group = [];
 % -- a string with a jocker '*' (ex. 'subj*')
 %   --> all subject directories with matching names are searched inside project directory
 % -- a cell of string: {'subject_01', 'subject_04'} or {'control*', 'patient*'}
-Sdir.subj = 'subject_01';
+Sdir.subj = 'subject_*';
 
-%------------ MEG data processing options
+%----------  MEG data processing options
 mopt = [];
 %- Filtering continuous data
 mopt.continuous.filt.type = 'bp';
-mopt.continuous.filt.fc = [0.5 250];
+mopt.continuous.filt.fc = [0.5 400];
 
 %- ICA component rejection 
 mopt.continuous.ica.reject = 1;
@@ -97,31 +97,58 @@ mopt.epoched.trialfun = 'trialfun_te';
 % number_of_condition x 2 with first column = condition names (as defined in
 % trigfun) and second column = associated epoching intervals as a   
 % [prestim postim] vector, in second with positive values 
-mopt.epoched.condition_dts = {'S', [3 3]
-                                'A', [3 3]
-                                'R', [3 3]
-                                'SAR', [1.5 5]};
+mopt.epoched.condition_dts = {'S', [1 2]
+                                'A', [1 2]
+                                'R', [1 2]};
 
 %%% TO ADD
 % Baseline intervals for each conditions (cf. for study with priming, 
 % default being the part of each epoch that is in the negative time part ( t < 0s)
-% If the number of condition is > 1 and bsl_dt_s is a 1x2 vector, the same
-% baseline interval will be used for all conditions.
-% If bsl_dt_s is set to empty, no baseline correction/ normalisation will
-% be done.
-% Time interval relative to the epoching time vector (ex. [-3 -2] s)
-% mopt.epoched.bsl_dt_s = 
 
-%- Resampling of epoching data
-mopt.epoched.resample_fs = 1000; %%%%%% []
+%- Resampling of epoching data - empty to keep raw data
+mopt.epoched.resample_fs = 500;
 
 % Remove the same bad trials selection per subject for all conditions ('same')
 % or define a bad trials selection for each condition ('each')
 mopt.epoched.rm_trials_cond = 'same';
 
-% Don't forget to add fieldtrip toolbox (Mars 2018)
+%----------  Options for source estmation by a beamforming method (LCMV or DICS)
+sopt = [];
+% Flag to indicate if data are to be concatenate across runs
+sopt.concat_run = 0;
+sopt.method = 'dics';
+% Time-frequency analysis parameters for DICS
+% cell with each row = one specific analysis
+% At each row, 4 parameters are given:
+% 1st column: analysis name as a string (ex. 'beta-gamma')
+% 2nd column: frequency of interest (FOI) in Hz (ex. 30)
+% 3rd column: width of the frequency smoothing in Hz (frequency resolution) (ex. 10)
+% 4th column: with of the time smoothing in s (time resolution) (ex. 0.200)
+% => {name, foi, Df, Dt}
+sopt.dics.freq_param = {'beta', 20, 8, 0.250
+                        'hga', 90, 30, 0.200};
 
-%___________________ END OF INPUT
+% Conditions parameters for DICS
+% cell with one row per specific input data to analyse with specific time of interest
+% 1st column: condition name of the input data  
+% 2nd column: output data name
+% 3rd column: times of interest in s as a vector of the central times of the slidding frequency 
+%   analysis windows - must be compatible with the epoched condition_dts
+%   parameters (with the same or shorter time boundaries)
+% => {cond_in, cond_out, toi}
+sopt.dics.cond_param =  {'S', 'BL', -0.500 : 0.005 : -0.100
+                        'A', 'A', -1.000 : 0.005 : 1.000};
+                    
+% Normalisation
+% Name of the time-frequency output data (baseline) to be used for normalisation (one of the 
+% 2nd column of cond_param)
+% For baseline data, only the mean and std power across time are saved in the result directory 
+sopt.dics.norm_cond_out = 'BL';
+
+% Don't forget to add fieldtrip toolbox to the Matlab paths (>= Mars 2018)
+
+%______________________ END OF INPUT
+
 % Ask for ft_crex toolbok if not presents in current working directory
 ptool = 'ft_crex';
 if ~exist('ft_crex', 'dir')
@@ -132,49 +159,36 @@ addpath(genpath(ptool))
 cp_pref
 ft_defaults
 
-% Import all required files in FIELDTRIP_DATABASE
-% if not done yet = files from anatomical preprocessing in Brainvisa/Freesurfer 
-% + raw MEG data
-% If Sdir.db_bv is not a valid path to reach brainvisa database, data importation
-% is not done
-cp_db_import(Sdir);
+% Import all required anatomical files in FIELDTRIP_DATABASE
+% Check for database paths
+Sdir = cp_db_import(Sdir);
 
 % Get the subjects list to process depending on Sdir information
 Sdb = cp_init(Sdir);
 
 % % Prepare MRI for fwd modelling (ask for FID if not found in directory or 
 % % in the header of the MRI file)
-% Sdb = cp_fwd_mri_prep(Sdb);
+Sdb = cp_fwd_mri_prep(Sdb);
 
-% Prepare MEG data for source estimations
+% Prepare MEG data for source estimations (if meg data have been already
+% imported)
 Sdb = cp_meg_prep(Sdb, mopt);
-% 
-% % Prepare single shell volume if not done yet
-% % Ask for fid information
-% Sdb = cp_fwd_singleshell(Sdb);
-% 
-% % Prepare atlas files (surf + vol)
-% Sdb = cp_marsatlas(Sdb);
-% 
-% % Define sources (for subcortical and cortical parcels) 
-% Sdb = cp_fwd_sources(Sdb, dsources_mm);
-% 
-% % Prepare source model including leadfield and head model => for the leadfield
-% % computation, we need to have the final CHANNEL selection depending on MEG data
-% % processing and of the run (cf. if not the same channel selection / run)
+
+% Prepare single shell volume if not done yet
+% Ask for fid information
+Sdb = cp_fwd_singleshell(Sdb);
+
+% Prepare atlas files (surf + vol)
+Sdb = cp_marsatlas(Sdb);
+
+% Define sources (for subcortical and cortical parcels) 
+Sdb = cp_fwd_sources(Sdb, dsources_mm);
+
+% Prepare source model including leadfield and head model => for the leadfield
+% computation, we need to have the final CHANNEL selection depending on MEG data
+% processing and of the run (cf. if not the same channel selection / run)
 Sdb = cp_fwd_leadfield(Sdb);  
 
-%... To be continued...
-% Next step => inverse problem
-%
-% Ex. from the model.mat of one subject
-% % disp('LCMV source analysis')
-% % cfg        =  [];
-% % cfg.method = 'lcmv';
-% % cfg.grid   = model.subcortical.grid;
-% % cfg.headmodel    = model.subcortical.headmodel;
-% % cfg.lcmv.lambda     = '5%';
-% % cfg.lcmv.keepfilter = 'yes';
-% % cfg.lcmv.fixedori   = 'yes'; % L'orientation est calculee via une ACP // orientation 3 dipoles
-% % sourceAll  = ft_sourceanalysis(cfg, cleanTrials.S);
+% Beamforming - only DICS for now
+Sdb = cp_inv_beamforming(Sdb, sopt);
 

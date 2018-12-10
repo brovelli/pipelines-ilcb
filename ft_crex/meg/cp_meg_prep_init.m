@@ -6,14 +6,15 @@ function Sdb = cp_meg_prep_init(Sdb, opt)
 %- check if cleanup fig are to be processed (new MEG data)
 %- check if ICA is to be processed (new sensor or strong artefact removing)
 %
-%-CREx180726
+%-CREx-180726
 
-% Init param_txt paths
+% Init param_txt paths -> Sdb.meg.preproc.param_txt
 Sdb = init_param_txt(Sdb, opt);
 
-% Check if cleanup_fig and/or ICA is to be done
 % Add the previously selected BAD elements read from TXT files
 % (sensors, strong artefact windows, ICA components, trials)
+% -> Sdb.meg.preproc.param_run
+% + check if cleanup_fig and/or ICA is to be done -> Sdb.meg.preproc.do
 Sdb = init_preproc(Sdb, opt);
 
 % Initialize all default paths for param_txt files
@@ -21,16 +22,15 @@ function Sdb = init_param_txt(Sdb, opt)
 
 Ns = length(Sdb);
 for i = 1 : Ns
-    
-    dp_par = make_dir([Sdb(i).dir, filesep, 'meg', filesep, 'preproc_param']);
+    dp_par = make_dir([Sdb(i).dir, filesep, 'meg', filesep, '_preproc_param']);
     dpp = [dp_par, filesep]; 
     
-    dpmeg = Sdb(i).meg.continuous;
+    dpinfo = Sdb(i).meg.info;
   
     drun = Sdb(i).meg.rundir;
     Nr = length(drun);
     
-    Sdb(i).meg.preproc.param_run = cell(Nr, 1);
+    Sprun = cell(Nr, 1);
     Spar = []; 
     Spar.dir = dp_par;
     % Check for rmsens_allrun.txt file
@@ -47,8 +47,9 @@ for i = 1 : Ns
         
         % RM trials depending on conditions
         
-        % Prepare markers name + values + (type)
-        cond = get_cond(dpmeg.raw{j}, opt);
+        % Prepare markers name + values + (type) according to hdr_event.event
+        % values and trigfun function
+        cond = get_cond(dpinfo{j}, opt);
 
         Nc = length(cond);
         
@@ -60,22 +61,23 @@ for i = 1 : Ns
             Spar.rmt.(srun).(scond) = [dpp, 'rmtrials_', srun, '_', scond, '.txt'];
         end
         % Condition to extract
-        Sdb(i).meg.preproc.param_run{j}.conditions = cond;
+        Sprun{j}.conditions = cond;
         % Associated epoching time [prestim postim]
-        Sdb(i).meg.preproc.param_run{j}.dt_s = epoching_opt(opt, cond);
+        Sprun{j}.dt_s = epoching_opt(opt, cond);
     end
     Sdb(i).meg.preproc.param_txt = Spar;
+	Sdb(i).meg.preproc.param_run = Sprun;
 end
  
 %- Define all conditions depending on what is returned by the trigfun function
 % This function may need sometimes the event structure to set conditions
 % depending on the markers recording during the run
-function cond = get_cond(praw, opt)
+function cond = get_cond(pinfo, opt)
 cond = opt.epoched.conditions;
 if ~isempty(cond)
     return;
 end
-hdr = loadvar([praw, filesep, 'hdr_event']);
+hdr = loadvar([pinfo, filesep, 'hdr_event']);
 ev = hdr.event;
 ftrig = str2func(opt.epoched.trigfun); 
 Strig = ftrig(ev);
@@ -107,54 +109,71 @@ sfilt = meg_prep_dir(opt);
 % Loop on subject to set preprocessing parameters
 Ns = length(Sdb);
 for i = 1 : Ns
-    dpmeg = Sdb(i).meg.continuous;
     
-    dp_raw = dpmeg.raw;
-    
-    % Preprocessing directory for continuous data
-    dp_prep = dpmeg.prep;
-
-    % Folder with parameter TXT files
-    partxt = Sdb(i).meg.preproc.param_txt;
-
     % Subject ID
     idsubj = Sdb(i).sinfo;
     
+    % MEG structure
+    Smeg = Sdb(i).meg;
+    
+    % Raw data paths
+    dp_raw = Smeg.raw;
+    
+    % Preprocessing directory for continuous data
+    dp_prep = Smeg.preproc.dir;
+    
+    % Clean data directory <--> where the clean data set will be saved for analysis
+    dp_clean = Smeg.analysis.dir;
+    
+    % info folder when hdr_event have been stored
+    dp_info = Smeg.info;
+    
+    % Folder with parameter TXT files
+    partxt = Smeg.preproc.param_txt;
+    
     % Run directory
-    rdir = Sdb(i).meg.rundir;
+    rdir = Smeg.rundir;
     Nr = length(rdir);
     
-    %--- Sprep will hold the preprocessing parameters for each run
-    Srun = Sdb(i).meg.preproc.param_run;
+    % Preprocessing parameters for each run
+    Srun = Smeg.preproc.param_run;
     
-    Sprep = [];
-    % Flag to indicate to generate new cleanup fig 
-    Sprep.new_vis = zeros(Nr, 1);
-    % Flag to indicate new artefact rejection => new dispdata and fftplots are
-    % to do in cleanup_fig_prep directory
-    Sprep.new_rma = zeros(Nr, 1);
-    % Flag to compute ICA if not previously done and fica==1
-    Sprep.new_ica = zeros(Nr, 1);
-    % Flag to process the bad trial interactive identification (ft_rejectvisual)
-    Sprep.new_rmt = zeros(Nr, 1);
+    % Sdo will hold the flag to indicate which new preprocessing computation
+    % have to be done
+    Sdo = [];
+    % New bad sensor selection or new cleanup fig 
+    Sdo.rms = zeros(Nr, 1);
+    % New artefact rejection => new dispdata and fftplots are
+    % to do in cleanup_fig directory
+    Sdo.rma = zeros(Nr, 1);
+    % New ICA if fica==1
+    Sdo.ica = zeros(Nr, 1);
+    % New bad trial interactive identification (by ft_rejectvisual)
+    Sdo.rmt = zeros(Nr, 1);
     % Prepare the epoched data for source analysis with the real opt
     % parameters for filtering and resampling + the RM sensors / comp /
     % trials 
-    Sprep.new_epch = zeros(Nr, 1);
+    Sdo.epch = zeros(Nr, 1);
     
+    % Loop over runs
     for j = 1 : Nr
- 
+        % Run directory ("run_*")
         srun = rdir{j};
         sinfo = [idsubj, ' -- ', srun];
         
-        % Keep raw data folder ==> the raw data will always be the
-        % departure point to the data processing
+        % Set paths to meg directories
         Spar = Srun{j};
-        Spar = set_dir(Spar, dp_raw{j}, dp_prep{j}, Sdb(i).meg.epoched.run_dir{j}, sfilt);
+        pprep = dp_prep{j};
+        Spar.dir = struct('raw', dp_raw{j},...
+                            'info', dp_info{j},...
+                            'preproc', pprep,...
+                            'cleanup_fig', make_dir([pprep, filesep, 'cleanup_fig']),...
+                            'ica', [pprep, filesep, 'ica'],...
+                            'clean', make_dir([dp_clean{j}, filesep, sfilt]));
          
         % Default folder for preprocessing figures
-        pfig_data = [Spar.dir.cleanup, filesep, 'datadisp'];
-        pfig_fft = [Spar.dir.cleanup, filesep, 'fftplots'];       
+        pfig_data = [Spar.dir.cleanup_fig, filesep, 'datadisp'];
+        pfig_fft = [Spar.dir.cleanup_fig, filesep, 'fftplots'];       
            
         % Figure with superimposed fft for bad channel manual selection
         Spar.rms_fig = [pfig_fft, filesep, 'fftstack_interact.fig'];    
@@ -165,9 +184,9 @@ for i = 1 : Ns
         
         %------------------ Do BAD SENSOR identification
         if ~exist(pfig_data, 'dir') || ~exist(pfig_fft, 'dir')...
-                || ~exist(Spar.rms_fig, 'file')
+                || ~exist(Spar.rms_fig, 'file') || ~exist(partxt.rms.(srun), 'file')
             % Do visu fig for the first time (except if it was done previously)
-            Sprep.new_vis(j) = 1;            
+            Sdo.rms(j) = 1;            
         end        
         
         %------------------ Do ICA 
@@ -176,9 +195,9 @@ for i = 1 : Ns
             if (~exist([pica, filesep, 'icaComp_res.mat'], 'file') ||...
                 ~exist([pica, filesep, 'preproc_ica.mat'], 'file'))
                 % Need to make ICA and/or redefine preproc_ica.mat
-                Sprep.new_ica(j) = 1;
+                Sdo.ica(j) = 1;
             else
-               [Sprep.new_ica(j), Spar] = check_ica_preproc(Spar, sinfo); 
+               [Sdo.ica(j), Spar] = check_ica_preproc(Spar, sinfo); 
             end
         end
         
@@ -186,62 +205,37 @@ for i = 1 : Ns
         % Check if bad trials identification have already be
         % done previously (depending on rms, rmc, rma and opt.epoched
         % parameters (should be the same for dt and conditions name)
-        if Sprep.new_vis(j) || Sprep.new_ica(j) 
-            Sprep.new_rmt(j) = 1;
+        if Sdo.rms(j) || Sdo.ica(j) 
+            Sdo.rmt(j) = 1;
         else
-            [Sprep.new_rmt(j), Spar] = check_prep_trials(Spar, isa_t);
+            [Sdo.rmt(j), Spar] = check_prep_trials(Spar, isa_t);
         end
         
         %------------------- Do the final epoching !!
-        if any([Sprep.new_vis(j) Sprep.new_ica(j) Sprep.new_rmt(j)])
-            Sprep.new_epch(j) = 1;
+        if any([Sdo.rms(j) Sdo.ica(j) Sdo.rmt(j)])
+            Sdo.epch(j) = 1;
         else
-            Sprep.new_epch(j) = check_epochs(Spar, isa_t);
+            Sdo.epch(j) = check_epochs(Spar, isa_t);
         end
         
         % Add the cleanTrials.mat path to the Sdb
-        if ~Sprep.new_epch(j)
-            Sdb(i).meg.clean_mat{j} = [Spar.dir.epoched, filesep, 'cleanData.mat'];           
+        if ~Sdo.epch(j)
+            Smeg.analysis.clean_mat{j} = [Spar.dir.clean, filesep, 'cleanTrials.mat'];           
+        else
+            Smeg.analysis.new_clean(j) = 1;
         end
-        Sdb(i).meg.clean_dir{j} = Spar.dir.epoched;
+        Smeg.analysis.clean_dir{j} = Spar.dir.clean;
         
-        Sprep.param_run{j} = Spar;        
+        Smeg.preproc.param_run{j} = Spar;    
     end
-
-    Sdb(i).meg.preproc = Sprep;
-    Sdb(i).meg.preproc.param_txt = partxt;
+    Smeg.preproc.do = Sdo;
+    Sdb(i).meg = Smeg;
 end
 
-% Set directories for preprocessing
-function Spar = set_dir(Spar, praw, pprep, ptr, sfilt)
-Spar.dir.raw = praw;
-
-% Preproc data directories / run %%% TO DO: add figure ica_results
-% etc
-Spar.dir.continuous = make_dir([pprep, filesep, sfilt]);
-Spar.dir.epoched = make_dir([ptr, filesep, sfilt]);
-
-% Default folder for preprocessing figures
-pfig = [pprep, filesep, '_cleanup_fig'];
-% Cleanup fig folder
-Spar.dir.cleanup = make_dir(pfig);               
-% Check for ICA
-pica = [pprep, filesep, '_ica'];    
-
-% ICA directory path
-Spar.dir.ica = pica; 
-
-% New trial identification if any change in opt.epoched conditions
-% compare to previously interactive identification
-ptrials = [ptr, filesep, '_cleanup_trials'];
-% Cleanup trials directory
-Spar.dir.trials = make_dir(ptrials);
-
-% Check for preprocessing parameters applied to previously saved epoched
-% data
+% Check for preprocessing parameters applied to previously saved epoched data
 function isep = check_epochs(Spar, isa_t)
 isep = 0;
-pep = Spar.dir.epoched;
+pep = Spar.dir.clean;
 ppr = [pep, filesep, 'preproc.mat'];
 pdat = [pep, filesep, 'cleanTrials.mat'];
 
@@ -286,7 +280,7 @@ end
 
 function [isrmt, Spar] = check_prep_trials(Spar, isa_t)
 isrmt = 0;
-pptr = [Spar.dir.trials, filesep, 'preproc_trials.mat'];
+pptr = [Spar.dir.preproc, filesep, 'preproc_trials.mat'];
 if ~exist(pptr, 'file')
     isrmt = 1;
     return;

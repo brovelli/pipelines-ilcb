@@ -1,4 +1,4 @@
-function [Scol, zchan] = cmeg_chancheck_fig(ftData, savpath, info)
+function Scol = cmeg_chancheck_fig(ftData, savpath, info)
 % Display the layout of MEG channels with an indication about the mean
 % value of the Hilbert envelop of the data at each channel
 % The value is normalized by the minimum enveloppe value found across all 
@@ -18,7 +18,6 @@ if ~isfield(ftData, 'grad')
     disp('No grad field in data (probably SEEG data)')
     disp('Abort the diplay of the layout with mean envelop amplitudes')
     Scol = [];
-    zchan = [];
     return;
 end
 chan = ftData.label;
@@ -35,8 +34,8 @@ end
 xd = ftData.trial{1};
 xd = xd - repmat(mean(xd,2),1,length(xd(1,:)));
 
+% Only channels with values ~=0
 isok = sum(xd, 2)~=0;
-zchan = chan(~isok);
 
 th_1 = hilbert(xd);               
 th_2 = sqrt(xd.^2 + th_1.*conj(th_1));
@@ -94,7 +93,7 @@ annotation(gcf,'textbox','String',tit,'interpreter','none',...
     'FitBoxToText','off','Position',[0.0033 0.9427 0.9489 0.0525],...
     'backgroundcolor',[1 1 1]);
 
-pfig = [savpath, filesep, 'ChanCheck_', num2str(Nc), 'chan.png'];
+pfig = [savpath, filesep, 'chancheck_', num2str(Nc), 'chan.png'];
 export_fig(pfig, '-m1.5')
 close
 fprintf('\nFigure showing mean values saved as :\n %s\n', pfig)

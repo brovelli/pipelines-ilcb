@@ -46,11 +46,10 @@ mri_bv = read_mri(pmri);
 % Be sure about the coordsys
 % mri.coordsys = 'ras';
 % ft_determine_coordsys
-mri_real = realign_mri(pdir, mri_bv);
+mri_real = realign_mri(pdir, mri_bv, dps.sinfo);
 
 % Keep transform matrix MRI space -> realigned space
 Mreal = mri_real.transform/mri_bv.transform;  %#ok
-
 
 % Reslice MRI before doing the segmentation
 % Problem with transform matrix still not clear
@@ -78,7 +77,7 @@ dps.anat.mri_resl = presl;
 dps.anat.Mreal = pMreal;
 
 % Realign MRI using fieldtrip
-function mri_real = realign_mri(pdir, mri)
+function mri_real = realign_mri(pdir, mri, idnam)
 
 cfg = [];
 
@@ -102,6 +101,10 @@ if ~exist(pfid, 'file')
         save(pfid, 'fid');
     else
         cfg.method = 'interactive';
+        % Inform user to proceed fiducial selection
+        uiwait(msgbox({'\fontsize{12}Please select the fiducials for subject: ';...
+            ['\fontsize{13}\bf ', prep_tex(idnam)]}, 'MRI realign', 'help',...
+            struct('WindowStyle', 'non-modal', 'Interpreter', 'tex')));
     end
 else
     % Check for fid mat ("fid" structure with fields "nas", "lpa", "rpa"

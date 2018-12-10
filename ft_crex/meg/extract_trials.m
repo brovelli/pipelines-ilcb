@@ -1,7 +1,11 @@
 function  allTrials = extract_trials(ftData, Spar, eopt)
+% Extract trial from continuous dataset ftData
+%-CREx180726
 
+% eopt.datafile is required in cmeg_extract_trials by ft_definetrial if the default trialfun
+% function is used ('ft_trialfun_general')
 eopt.datafile = Spar.dir.raw;
-% Return event structures without trials falling inside strong artefact (if any)
+% Return event structures without trials falling inside strong artefacts (if any)
 [Strig, allev] = event_padart(Spar, eopt.trigfun);
 
 cond = {Strig(:).name}';
@@ -14,6 +18,8 @@ for k = 1 : Nc
     eopt.poststim = eopt.trig.dt_s(2);
     trials = cmeg_extract_trials(ftData, allev, eopt);
 
+    % Be sure to set grad in mm for source analysis
+    trials.grad = ft_convert_units(trials.grad, 'mm');
     %-- Resampling   
     if ~isempty(eopt.res_fs)
         cfg = [];
@@ -24,11 +30,11 @@ for k = 1 : Nc
 end
 
 function [Strig, allev] = event_padart(Spar, trigfun)
-praw = Spar.dir.raw;
+
 cond = Spar.conditions;
 
 % Get the events structure
-hdr = loadvar([praw, filesep, 'hdr_event']);
+hdr = loadvar([Spar.dir.info, filesep, 'hdr_event']);
 allev = hdr.event;
 ftrig = str2func(trigfun); 
 Strig = ftrig(allev);

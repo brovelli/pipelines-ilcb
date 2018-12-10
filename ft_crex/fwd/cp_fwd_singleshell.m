@@ -66,7 +66,7 @@ dps.fwd.shell = pshell;
 
 %-- Draw figure with MEG channels + head conduction volume
 % Place figure in a separated 'coreg' directory to check for the results
-pmeg = dps.meg.continuous.raw{1};
+pmeg = dps.meg.raw{1};
 draw = filepath_raw(pmeg);
 fprintf('\nCo-registration figures...')
 if ~isempty(draw)

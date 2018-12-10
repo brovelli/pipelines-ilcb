@@ -74,9 +74,9 @@ for i = 1 : Nt
         if ~isempty(strfind(strans, 'brainvisa'))  %#ok
             % fullfile will change the filesep direction if the OS for current data
             % processing is different from the OS used for atlas preparation
-            ptr = fullfile(opt.dir.bv, strans(isi+5 : end));
+            ptr = fullfile(opt.db_dir.bv, strans(isi+5 : end));
         else
-            ptr = fullfile(opt.dir.fs, strans(isi+5 : end));    
+            ptr = fullfile(opt.db_dir.fs, strans(isi+5 : end));    
         end
         
     else
