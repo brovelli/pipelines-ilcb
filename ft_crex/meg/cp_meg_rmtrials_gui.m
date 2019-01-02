@@ -17,7 +17,7 @@ for i = 1 : Ns
     
     idnam = fullfile(dps.proj, dps.group, dps.subj);
     
-    drun = dps.meg.rundir;
+    drun = dps.meg.run.dir;
     Nr = length(drun);
     
     Sdisp = [];

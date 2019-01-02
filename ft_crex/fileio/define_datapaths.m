@@ -23,11 +23,17 @@ function [allpaths, subj, grp, proj] = define_datapaths(pcell, isubj, igrp, ipro
 
 % Define all path list
 allpaths = make_pathlist(pcell);
+
+if isempty(allpaths)
+    [subj, grp, proj] = deal([]);
+    return;
+end
+
 Np = length(allpaths);
 
 % Use partpath function to find the corresponding subject, group and
 % project names
-if nargin>=2 && ~isempty(isubj)
+if nargin>=2 && ~isempty(isubj) 
     subj = partpath(pcell, allpaths, isubj);
 else
     subj = cell(Np, 1);

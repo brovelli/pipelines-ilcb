@@ -126,6 +126,13 @@ if isempty(opt.epoched.condition_dts)
     error('Abort processing')
 end
 
+%-- Fixed option for continuous data preprocessing
+popt = [];
+popt.type = 'hp';
+popt.fc = 0.5;   
+popt.res_fs = 400;
+opt.preproc = popt;
+
 %-- Check for HP filtering if ICA is required
 fica = opt.continuous.ica.reject;
 fopt = opt.continuous.filt;
@@ -140,15 +147,19 @@ end
 opt.epoched.conditions = opt.epoched.condition_dts(:, 1);
 opt.epoched.dt_s = vertcat(opt.epoched.condition_dts{:, 2});
 
-%-- Do processing as long as required (depending on final review changes)
-isval = 0;
-while ~isval    
+
+%-- Do MEG preprocessing pipeline   
+Sdbm = prep_pipeline(Sdbm, opt);
+
+% Final review
+%---- Confirm a last time all the preprocessing parameters for all subjects 
+% (if any change in parameters, and ICA is required, check 
+[Sdbm, ischg] = cp_meg_review_gui(Sdbm, opt);
+
+% If any change and ICA is required, check for new preproc option
+% compatibility with the one used before ICA computation
+if fica && ischg
     Sdbm = prep_pipeline(Sdbm, opt);
-    % Final review
-    %---- Confirm a last time all the preprocessing parameters for all subjects (if
-    % any change in parameters, write the new one in txt file and launch the
-    % prep_pipeline
-    isval = cp_meg_review_gui(Sdbm, opt);
 end
 
 %-- Do the preprocessing with the requested filtering option and the cleaning
@@ -165,23 +176,22 @@ Sdb(imeg) = Sdbm;
 % trials
 function Sdb = prep_pipeline(Sdb, opt)
 
-% Initialize all param_txt files
+%- Initialize all param_txt files
 Sdb = cp_meg_prep_init(Sdb, opt);
 
-%- Make figures to help for bad channels + strong artefact identification 
-% A light data set version is processed from the original data set for visualization
-% with:
-% - at least a HP filtering with fc = 0.5 Hz if fopt.type is empty or 'lp'
-% - a resampling at 400 Hz
-Sdb = cp_meg_cleanup_fig(Sdb);
+%- Strong artefact identification (required first before spectra
+% superimposition for bad channel selection) 
+sopt = opt.preproc;
+sopt.rm_sens_run = opt.continuous.rm_sens_run;
+Sdb = cp_meg_cleanup_art(Sdb, sopt);
 
-% Input of bad channels 
-%%% TO DO: add the strong artefact input too --> rms
-Sdb = cp_meg_rmsens_gui(Sdb, opt.continuous);
+%- Bad channel identification
+Sdb = cp_meg_cleanup_sens(Sdb, sopt);
 
-% ICA for artefact cleaning
-Sdb = cp_meg_cleanup_ica(Sdb, opt.continuous.ica.numcomp);
+%- ICA for artefact cleaning
+sopt.Nc = opt.continuous.ica.numcomp;
+Sdb = cp_meg_cleanup_ica(Sdb, sopt);
 
-% Bad trials identification with semi-automatic method -- on the HP and
+%- Bad trials identification with semi-automatic method -- on the HP and
 % resampling data version, cleaning from artefacts
 Sdb = cp_meg_cleanup_trials(Sdb, opt);

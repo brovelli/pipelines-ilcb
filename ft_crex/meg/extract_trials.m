@@ -2,14 +2,17 @@ function  allTrials = extract_trials(ftData, Spar, eopt)
 % Extract trial from continuous dataset ftData
 %-CREx180726
 
+% Trial number association by condition
+isa_t = strcmp(eopt.rm_trials_cond, 'same');
 % eopt.datafile is required in cmeg_extract_trials by ft_definetrial if the default trialfun
 % function is used ('ft_trialfun_general')
 eopt.datafile = Spar.dir.raw;
 % Return event structures without trials falling inside strong artefacts (if any)
-[Strig, allev] = event_padart(Spar, eopt.trigfun);
+[Strig, allev, iwart] = prepare_event(Spar, eopt.trigfun);
 
 cond = {Strig(:).name}';
 Nc = length(cond);
+
 for k = 1 : Nc
     cnam = cond{k};
     eopt.trig = Strig(k);   
@@ -18,6 +21,14 @@ for k = 1 : Nc
     eopt.poststim = eopt.trig.dt_s(2);
     trials = cmeg_extract_trials(ftData, allev, eopt);
 
+    % Identify trials that contain portion of artefact
+    isart = artefact_inside(trials.sampleinfo, iwart);
+    if isa_t
+        if k==1
+            allart = zeros(length(isart), Nc);
+        end
+        allart(:, k) = isart;
+    end
     % Be sure to set grad in mm for source analysis
     trials.grad = ft_convert_units(trials.grad, 'mm');
     %-- Resampling   
@@ -26,10 +37,18 @@ for k = 1 : Nc
         cfg.resamplefs = eopt.res_fs;
         trials = ft_resampledata(cfg, trials); 
     end
+    trials.hdr.artefact = isart;
     allTrials.(cnam) = trials;
 end
+% Same artefact info for all conditions
+if isa_t && any(allart(:))
+    allart = sum(allart, 2) > 0;
+    for k = 1 : Nc
+        allTrials.(cond{k}).hdr.artefact = allart;
+    end
+end
 
-function [Strig, allev] = event_padart(Spar, trigfun)
+function [Strig, allev, iart] = prepare_event(Spar, trigfun)
 
 cond = Spar.conditions;
 
@@ -50,35 +69,31 @@ end
 % Remove artefact
 wina = Spar.rm.art;
 if isempty(wina)
+    iart = [];
     return;
 end
-% Add additional 1 s around the padart window to remove events in addition
-% to them that fall inside the artefact window itself
+% Artefact windows
 Fs = hdr.Fs;
-wina = wina.*Fs;
-winpad = [wina(:,1)-Fs wina(:,2)+Fs];
+iart = wina.*Fs;
 
-% Remove all events that fall inside the artefact enlarged windows
-allev = set_padart_event(allev, winpad);
+% Identify trials which contain a portion of padded artefact
+function isart = artefact_inside(iwtr, iwart)
+Ntr = length(iwtr(:, 1));
+isart = zeros(Ntr, 1);
+if isempty(iwart)
+    return;
+end
 
-
-% Change event type (TRIGGER or RESPONSE) to INSIDE_PADART
-% in order to exclude these events for further processing (epoching)
-function ev = set_padart_event(ev, winpad)
-
-sval = cell2mat({ev.sample})';
-
-Na = length(winpad(:,1));
-for k = 1 : Na
-    ide = find(sval >= winpad(k,1) & sval <= winpad(k,2));
-    if ~isempty(ide)
-        for j = 1 : length(ide)
-            ev(ide(j)).type = 'INSIDE_PADART';
+Na = length(iwart(:, 1));
+for i = 1 : Ntr
+    intr = iwtr(i, 1) : iwtr(i, 2);
+    for j = 1 : Na
+        inta = iwart(j, 1) : iwart(j, 2);
+        if any(ismember(intr, inta))
+            isart(i) = 1;
+            continue;
         end
     end
 end
-ikeep = strcmp({ev.type}', 'INSIDE_PADART') == 0;
-Nini = length(ev);
-ev = ev(ikeep);
 
-fprintf('\nKept trials outside strong artefacts: %d/%d\n', sum(ikeep), Nini);
+fprintf('\nKept trials outside strong artefacts: %d/%d\n', sum(~isart), Ntr);

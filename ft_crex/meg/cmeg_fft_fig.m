@@ -1,4 +1,4 @@
-function pfig = cmeg_fftstack_fig(spData, opt) %spsparam,datapath,pathsavfig,datatyp)
+function pfig = cmeg_fft_fig(spData, opt) %spsparam,datapath,pathsavfig,datatyp)
 % Figure of superimposed spectra computed from data of each channel 
 %
 % A label with the channel name is added to identify spectrum with extremum
@@ -6,30 +6,24 @@ function pfig = cmeg_fftstack_fig(spData, opt) %spsparam,datapath,pathsavfig,dat
 %
 %-CREx180731
 
-
-%-- Before plotting, check if data exists...
-if ~isfield(spData, 'spectra') || isempty(spData.spectra) || sum(sum(spData.spectra))==0 
-    disp('spData is empty')
+if isempty(spData)
     return;
 end
 
 %-- Check for inputs
-defopt = struct('sps_param', [], 'savepath', pwd, 'info', []);
+dopt = struct('savepath', pwd, 'info', [], 'rmchan', []);
 % Set default option if required
 if nargin < 2
-    opt = defopt;
+    opt = dopt;
 else
-    opt = check_opt(opt, defopt);
+    opt = check_opt(opt, dopt);
 end
 
 % Spectra calculation parameters
-if isempty(opt.sps_param)
-    stktit = [];
-else
-    sppar = opt.sps_param;
-    stktit = ['- [Nsp= ',num2str(sppar.n),' ; Dsp= ',num2str(sppar.dur),' s ; ti= ',...
-    num2str(sppar.dur*2),' s]'];
-end
+sppar = spData.param;
+stktit = ['- [Nsp= ',num2str(sppar.n),' ; Dsp= ',num2str(sppar.dur),' s ; ti= ',...
+            num2str(sppar.dur*2),' s]'];
+
 % Info on data path to add on the figure title
 sinfo = opt.info;
 % Save path
@@ -49,18 +43,13 @@ fwin = [0.8 4 ; 5 40 ; 120 200];
 
 %---- Prepare data
 
-% First by removing data with spectrum value == 0
-
-fz = spData.spectra(:, 1)==0;
-if any(fz)
-    disp('!! Frequency spectrum == 0 for channel(s) :')
-    disp(spData.label(fz))
-    zlab = spData.label(fz);
-    % Keep only non-zero data
+% First by removing data with extremum/zero spectrum value 
+% that have been detected before
+zlab = opt.rmchan;
+if ~isempty(zlab)   
+    fz = ismember(spData.label, zlab);
     spData.label = spData.label(~fz);
     spData.spectra = spData.spectra(~fz, :);
-else
-    zlab = [];
 end
 
 % Define a smooth version (5-span points smoothing) 
@@ -118,7 +107,7 @@ fprintf('\nFigure of stacked spectrum saved in ---\n----> %s\n\n', psav);
 function add_buttons(zlab)
 set(gca, 'position', [0.092514 0.11147 0.72116 0.80324])
 
-% Add a validate button 
+% Button to add channel in the list of BAD channels
 hbad = put_figtext('Declare as bad', 'sw', 12, [0.75 0 0], [0.97 0.97 0.97]);
 set(hbad, 'units', 'normalized', 'position', [1.022 0.935],...
     'margin', 5, 'edgecolor', [0.55 0 0], 'linewidth', 2,...
@@ -126,13 +115,13 @@ set(hbad, 'units', 'normalized', 'position', [1.022 0.935],...
 ext = get(hbad, 'Extent');
 dh = ext(4);
 
-% Add a reset button 
+% Button to remove channel from the BAD list 
 hgd = put_figtext('Remove from bad', 'sw', 12, [0 0.75 0], [0.97 0.97 0.97]);
 set(hgd, 'units', 'normalized', 'position', [ext(1) ext(2)-1.5*dh],...
     'margin', 5, 'edgecolor', [0 0.75 0.4], 'linewidth', 2,...
     'tag', 'but_good');
 
-% Box to display bad channels
+% Box to display bad channels list
 annotation(gcf, 'textbox', [0.8312 0.66765 0.12028 0.042637],...
     'EdgeColor', 'none', 'HorizontalAlignment', 'center',...
     'fontsize', 12, 'color', [0.75 0 0], 'string', 'BAD:');
@@ -141,7 +130,7 @@ annotation(gcf, 'textbox', [0.8312 0.30294 0.12028 0.36471],...
     'EdgeColor', 'none', 'BackgroundColor', [1 0.96 0.92],...
     'fontsize', 12, 'tag', 'lab_bad', 'color', [0.75 0 0], 'string', zlab);
 
-% Add a reset button 
+% Validate button
 hcf = put_figtext('Confirm selection', 'sw', 12, [0.3 0.3 0.3], [0.97 0.97 0.97]);
 set(hcf, 'units', 'normalized', 'position', [ext(1) 0.2],...
     'margin', 5, 'edgecolor', [0.75 0.4 0.1], 'linewidth', 2,...
@@ -153,7 +142,7 @@ if isempty(zlab)
     hz = [];
     return;
 end
-hz = put_figtext([{'Bad channel(s) with 0 values:'}; zlab], 'sw');
+hz = put_figtext([{'Removed channel(s) (extremum/zero values):'}; zlab], 'sw');
 
 % Index of frequencies in freq vector that are nearest to fcheck frequencies 
 % values

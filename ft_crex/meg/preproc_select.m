@@ -22,7 +22,7 @@ function varargout = preproc_select(varargin)
 
 % Edit the above text to modify the response to help preproc_select
 
-% Last Modified by GUIDE v2.5 02-Aug-2018 13:36:38
+% Last Modified by GUIDE v2.5 14-Dec-2018 17:02:29
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -77,7 +77,7 @@ handles.title.BackgroundColor = [1 1 1];
 handles.lab_good.BackgroundColor = [1 1 1];
 handles.lab_bad.BackgroundColor = [1 1 1];
 handles.lab_click.BackgroundColor = [1 1 1];
-
+handles.badrun = 0;
 set(handles.main, 'CloseRequestFcn', []);
 
 % Update handles structure
@@ -94,7 +94,8 @@ function varargout = preproc_select_OutputFcn(hObject, eventdata, handles)  %#ok
 % handles    structure with handles and user data (see GUIDATA)
 
 % Get default command line output from handles structure
-varargout{1} = handles.bad.clist;  
+varargout{1} = handles.bad.clist;
+varargout{2} = handles.badrun;
 delete(hObject)
 
 % --- Executes on button press in push_bad.
@@ -208,6 +209,14 @@ if ~iso
     uiwait(msg_box(smsg));
 end
 
+% --- Executes on button press in push_badrun.
+function push_badrun_Callback(hObject, eventdata, handles) %#ok
+% hObject    handle to push_badrun (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+handles.badrun = 1;
+guidata(hObject,handles)
+uiresume;
 %------------------------ Additionnal functions
 
 function Sdisp = prepare_listbox(Sdisp)

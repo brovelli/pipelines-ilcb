@@ -25,7 +25,6 @@ function trials = cmeg_extract_trials(ftData, Sev, opt)
 %   This parameters are eventually used by the project's specific function
 %   defined by opt.trialfun.
 %
-%
 % (** Mandatory variables)
 % ---
 

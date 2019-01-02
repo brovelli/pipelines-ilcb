@@ -13,7 +13,6 @@ function Sdb = cp_fwd_mri_prep(Sdb)
 %
 %-CREx-180820
 
-
 % Number of data to process
 Np = length(Sdb);
 
@@ -22,14 +21,14 @@ wb = waitbar(0, 'Prepare MRI...', 'name', 'MRI preprocessing');
 wb_custcol(wb, [0 0.6 0.8]);
 
 % Realigned MRI by Fieldtrip interactive method if not done yet 
-for i = 1 : Np   
-	waitbar(i/Np, wb, ['MRI preparation: ', Sdb(i).sinfo]);  
+for i = 1 : Np   	
+    waitbar((i-1)/Np, wb, ['MRI preparation: ', Sdb(i).sinfo]);
     % Check if mri_real already compute       
-    if isempty(Sdb(i).anat.mri_real)
+    if ~isempty(Sdb(i).anat.mri) && isempty(Sdb(i).anat.mri_real)
         % If not, prepare MRI: read the MRI file, realigne and reslice it, and 
         % keep the final Mreal transformation matrix 
         Sdb(i) = prepare_mri(Sdb(i));
-    end  
+    end   
 end
 
 close(wb);
@@ -104,6 +103,13 @@ if ~exist(pfid, 'file')
         % Inform user to proceed fiducial selection
         uiwait(msgbox({'\fontsize{12}Please select the fiducials for subject: ';...
             ['\fontsize{13}\bf ', prep_tex(idnam)]}, 'MRI realign', 'help',...
+            struct('WindowStyle', 'non-modal', 'Interpreter', 'tex')));
+        % Inform user to identify fiducial including a z-point
+        uiwait(msgbox({'\fontsize{11}Required fiducial points are: ';...
+            'RPA, LPA, Nasion and a Z-point';...
+            ['If the right side is not identifiable,'...
+            ' an automatic detection and correction will be made during '...
+            'co-registration.']}, 'MRI realign', 'help',...
             struct('WindowStyle', 'non-modal', 'Interpreter', 'tex')));
     end
 else
