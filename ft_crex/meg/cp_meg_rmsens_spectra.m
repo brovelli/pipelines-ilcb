@@ -1,4 +1,7 @@
 function rms = cp_meg_rmsens_spectra(pfig, rmsini)
+% Get the bad sensors from interactive selection on the spectra figure
+%-CREx180720
+
 if nargin < 2
     rmsini = [];
 else
@@ -27,6 +30,7 @@ rms = get_add(hlist);
 
 delete(gcf)
 
+% Add callbacks
 function hlist = add_controls(rmsini)
 hlist = find_annot('lab_bad');
 
@@ -104,7 +108,7 @@ if ~isempty(clab)
 end
 set(gcf, 'WindowButtonDownFcn', {@dispnamesp, hlist});
 
-% ButtonDownFcn callback function to validate the new manually selected delay
+% Validate
 function validate(~, ~) 
 uiresume;
 
@@ -120,6 +124,7 @@ if Nh > 1
     end
 end
 
+% Display channel name on figure title
 function dispnamesp(~, ~, hlist)
 
 keep_bad(hlist);

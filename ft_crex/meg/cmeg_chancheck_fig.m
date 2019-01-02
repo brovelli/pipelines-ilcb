@@ -1,4 +1,4 @@
-function Scol = cmeg_chancheck_fig(ftData, savpath, info)
+function Scol = cmeg_chancheck_fig(ftData, savpath, info, badchan)
 % Display the layout of MEG channels with an indication about the mean
 % value of the Hilbert envelop of the data at each channel
 % The value is normalized by the minimum enveloppe value found across all 
@@ -6,7 +6,9 @@ function Scol = cmeg_chancheck_fig(ftData, savpath, info)
 % A value of 4 for channel A42 indicate that the mean amplitude of Hilbert
 % envelop of the data recording by this channel is 4 order higher than the
 % minimum mean value found in the whole data set.
-
+if nargin < 4
+    badchan = [];
+end
 if nargin<3
     info = '';
 end
@@ -30,20 +32,23 @@ else
     flay = '4D248_helmet.mat';
 end
 
-% Remove mean
+% Remove the mean
 xd = ftData.trial{1};
 xd = xd - repmat(mean(xd,2),1,length(xd(1,:)));
 
 % Only channels with values ~=0
 isok = sum(xd, 2)~=0;
 
-th_1 = hilbert(xd);               
-th_2 = sqrt(xd.^2 + th_1.*conj(th_1));
-xmh = mean(th_2, 2);
+if ~isempty(badchan)
+    isok = isok & ~ismember(chan, badchan);
+end
+env = abs(transpose(hilbert(transpose(xd)))); 
+xmh = mean(env, 2);
 
-% Define colormap
+% Define colormap - excluding extremum values (bad channels) 
 cmap = colormap_blue2red;
-val = linspace(min(xmh(isok)), max(xmh), length(cmap(:,1)));
+xval = xmh(isok);
+val = linspace(min(xval), max(xval), length(cmap(:,1)));
 
 % Get the x,y sensor position on layout
 cfg = [];
@@ -66,7 +71,7 @@ indc = indc(indc~=0);
 xmh = xmh(indc);
 isok = isok(indc);
 
-chancol = cell2mat(arrayfun(@(x) cmap(find(val <= x, 1, 'last'), :), xmh, 'UniformOutput', 0));
+chancol = cell2mat(arrayfun(@(x) cmap(find(val <= x, 1, 'last'), :), xval, 'UniformOutput', 0));
 
 if any(~isok)
     chancolz = zeros(Nc, 3);
@@ -79,7 +84,7 @@ end
 Scol = [];
 Scol.chan = laylab;
 Scol.col = chancol;
-Scol.val = xmh;
+Scol.val = xval;
 Scol.pos = xy;
 
 % Plot

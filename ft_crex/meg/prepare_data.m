@@ -15,7 +15,7 @@ fopt.channel = chan_sel(rms);
 ftData = cmeg_extract_filt(Spar.dir.raw, fopt);  
 
 %-- Remove strong artefacts        
-ftData = cmeg_padding_artefact(ftData, rma);  
+ftData = cmeg_artefact_rm(ftData, rma);  
 
 function ftData = prep_data_ica(Spar, fopt)
 
@@ -46,7 +46,7 @@ if ~isempty(chansel)
 end
 
 %-- Remove strong artefacts        
-ftData = cmeg_padding_artefact(ftData, prepi.rma.after); 
+ftData = cmeg_artefact_rm(ftData, prepi.rma.after); 
 
 %--- Final filter if fopti ~=fopt
 if ~strcmp(fopti.type, fopt.type) || ~all(fopti.fc == fopt.fc)

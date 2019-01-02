@@ -107,7 +107,15 @@ dpath.tex_full = fullfile(pbvm, 'surface_analysis', '*_*white_parcels_marsAtlas.
 dpath.vol = fullfile(pbvm, 'surface_analysis', '*_parcellation.nii.gz');
 %---------------
 % Define all datapaths from ft database
-dp_bv = bv_datapaths(Sdir);
+if isbv
+    dp_bv = datapaths(Sdir, 'db_bv');
+else
+    if ismeg
+        dp_bv = datapaths(Sdir, 'db_meg');
+    else
+        return;
+    end
+end
 
 % Check for transform files + anat files + meg path
 Ns = length(dp_bv);
@@ -352,10 +360,10 @@ for i = 1 : Nd
 end
 
 % Find all directories for MEG data processing
-function dp = bv_datapaths(Sdir)
+function dp = datapaths(Sdir, sini)
 
 % Main database directory
-db_dir = Sdir.db_bv;
+db_dir = Sdir.(sini);
 
 % Add group level directory if Sdir.group is not empty
 if ~isempty(Sdir.group)
@@ -375,6 +383,9 @@ end
 iproj = 2;
 
 [alldp, subj, grp, prj] = define_datapaths(cpmeg, isubj, igrp, iproj);
-
-dp = cell2struct([alldp'; subj'; grp'; prj'], {'dir', 'subj', 'group', 'proj'});
+if ~isempty(alldp)
+    dp = cell2struct([alldp'; subj'; grp'; prj'], {'dir', 'subj', 'group', 'proj'});
+else
+    dp = {};
+end
 

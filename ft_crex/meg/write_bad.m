@@ -2,12 +2,16 @@ function write_bad(ptxt, rmb, styp)
 if nargin < 3 || isempty(styp)
     if iscell(rmb)
         styp = 'sens';
+    elseif size(rmb, 2)==2
+        styp = 'art';
     else
         styp = 'elements';
     end
 end
 if strcmp(styp, 'sens') || strcmp(styp, 'sensors')
     write_sens(ptxt, rmb);
+elseif strcmp(styp, 'art')
+    write_art(ptxt, rmb);
 else
     write_comp(ptxt, rmb, styp);
 end
@@ -34,6 +38,27 @@ fprintf(fid, '%s\n', rms{1: end-1});
 fprintf(fid, '%s', rms{end});
 fclose(fid);
 
+% Write artefact windows
+function write_art(ptxt, rma)
+if isempty(rma)
+    rma = [];
+    Nc = 0;
+else
+    Nc = length(rma(:, 1));
+end
+fid = fopen(ptxt, 'w');
+if ~fid
+    warning('Unable to write strong artefact(s) in %s', ptxt);
+    return;
+end
+
+for i = 1 : Nc
+    fprintf(fid, '%4.4f\t%4.4f', rma(i, 1), rma(i, 2));  
+    if i < Nc
+        fprintf(fid, '\n');
+    end
+end
+fclose(fid);
 
 % Write comp/trials
 function write_comp(ptxt, rmc, styp)

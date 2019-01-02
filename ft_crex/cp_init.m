@@ -18,6 +18,10 @@ Sdir = check_opt(Sdir, Sdp);
 % Define all datapaths from ft database
 dp_ft = db_datapaths(Sdir);
 
+if isempty(dp_ft)
+    Sdb = [];
+    return;
+end
 % Check for transform files + anat files + meg path
 Ns = length(dp_ft);
 
@@ -44,6 +48,10 @@ for i = 1 : Ns
     % Add already process file path (MAT) if exists
     dps = add_mat(dps);
     
+    % Add coreg flag if already done
+    pcor = [dps.dir, filesep, 'coreg', filesep, 'coreg.mat'];
+    dps.coreg = exist(pcor, 'file');
+    
     % Expected MEG data directory
     % Check for raw data ==> create hdr_event.mat for coregistration figures 
     % + the raw and preprocessed meg datapath list
@@ -53,8 +61,12 @@ for i = 1 : Ns
     % anat file are)    
     dps.meg = cp_db_megpaths(prmeg, [dps.dir, filesep, 'meg'], Sdir.meg_run);
     
-    % Initialize fwd model mat paths
-    dps.fwd.model_run = cell(dps.meg.Nrun, 1);
+    % Initialize fwd model
+    if ~isempty(dps.meg)
+        dps.fwd.model_run = cell(dps.meg.Nrun, 1); 
+    else
+        dps.fwd.model_run = [];
+    end
     
     if i==1
         Sdb = dps;
@@ -161,11 +173,14 @@ end
 iproj = 2;
 
 [alldp, subj, grp, prj] = define_datapaths(cpft, isubj, igrp, iproj);
-
-dp = cell2struct([alldp'; subj'; grp'; prj'], {'dir', 'subj', 'group', 'proj'});
+if ~isempty(alldp)
+    dp = cell2struct([alldp'; subj'; grp'; prj'], {'dir', 'subj', 'group', 'proj'});
+else
+    dp = [];
+    return
+end
 
 iproc = Sdir.iproc;
-
 if ~isempty(iproc) && max(iproc) <= length(alldp)
     dp = dp(iproc);
 end

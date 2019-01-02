@@ -22,12 +22,13 @@ function Sdb = init_param_txt(Sdb, opt)
 
 Ns = length(Sdb);
 for i = 1 : Ns
-    dp_par = make_dir([Sdb(i).dir, filesep, 'meg', filesep, '_preproc_param']);
-    dpp = [dp_par, filesep]; 
+    Smeg = Sdb(i).meg;
+    dp_par = Smeg.txt_dir;
+    dpp = [dp_par, fsep]; 
     
-    dpinfo = Sdb(i).meg.info;
+    dpinfo = Smeg.info;
   
-    drun = Sdb(i).meg.rundir;
+    drun = Smeg.run.dir;
     Nr = length(drun);
     
     Sprun = cell(Nr, 1);
@@ -77,7 +78,7 @@ cond = opt.epoched.conditions;
 if ~isempty(cond)
     return;
 end
-hdr = loadvar([pinfo, filesep, 'hdr_event']);
+hdr = loadvar([pinfo, fsep, 'hdr_event']);
 ev = hdr.event;
 ftrig = str2func(opt.epoched.trigfun); 
 Strig = ftrig(ev);
@@ -132,7 +133,7 @@ for i = 1 : Ns
     partxt = Smeg.preproc.param_txt;
     
     % Run directory
-    rdir = Smeg.rundir;
+    rdir = Smeg.run.dir;
     Nr = length(rdir);
     
     % Preprocessing parameters for each run
@@ -148,6 +149,8 @@ for i = 1 : Ns
     Sdo.rma = zeros(Nr, 1);
     % New ICA if fica==1
     Sdo.ica = zeros(Nr, 1);
+    % Bad component selection
+    Sdo.rmc = zeros(Nr, 1);
     % New bad trial interactive identification (by ft_rejectvisual)
     Sdo.rmt = zeros(Nr, 1);
     % Prepare the epoched data for source analysis with the real opt
@@ -157,6 +160,14 @@ for i = 1 : Ns
     
     % Loop over runs
     for j = 1 : Nr
+        % Update run statut (that could have changed during the final review)
+        Smeg.run.valid(j) = update_valrun(Smeg.run.valtxt{j});
+
+        % If run is not valid, keep all do flag = zeros
+        if ~Smeg.run.valid(j)
+            continue;
+        end
+        
         % Run directory ("run_*")
         srun = rdir{j};
         sinfo = [idsubj, ' -- ', srun];
@@ -167,38 +178,57 @@ for i = 1 : Ns
         Spar.dir = struct('raw', dp_raw{j},...
                             'info', dp_info{j},...
                             'preproc', pprep,...
-                            'cleanup_fig', make_dir([pprep, filesep, 'cleanup_fig']),...
-                            'ica', [pprep, filesep, 'ica'],...
-                            'clean', make_dir([dp_clean{j}, filesep, sfilt]));
+                            'cleanup_fig', make_dir([pprep, fsep, 'cleanup_fig']),...
+                            'ica', [pprep, fsep, 'ica'],...
+                            'clean', make_dir([dp_clean{j}, fsep, sfilt]));
          
         % Default folder for preprocessing figures
-        pfig_data = [Spar.dir.cleanup_fig, filesep, 'datadisp'];
-        pfig_fft = [Spar.dir.cleanup_fig, filesep, 'fftplots'];       
+        pfig_data = [Spar.dir.cleanup_fig, fsep, 'datadisp'];
+        pfig_fft = [Spar.dir.cleanup_fig, fsep, 'fftplots'];       
            
         % Figure with superimposed fft for bad channel manual selection
-        Spar.rms_fig = [pfig_fft, filesep, 'fftstack_interact.fig'];    
+        Spar.rms_fig = [pfig_fft, fsep, 'fftstack_interact.fig'];    
         
         %--- Read all previously saved parameters in txt files according to
         % paramaters isa_s, fica and isa_t
         Spar = read_param_txt(Spar, partxt, srun, isa_s, fica, isa_t);
-        
+
+        %------------------ Do STRONG ARTEFACT detection
+        % Do artefact detection for the first time (except if it was done previously)
+        if ~exist(partxt.rma.(srun), 'file')            
+            Sdo.rma(j) = 1;            
+        end           
         %------------------ Do BAD SENSOR identification
+        % Do data figures and bad sensor identification for the first time
         if ~exist(pfig_data, 'dir') || ~exist(pfig_fft, 'dir')...
-                || ~exist(Spar.rms_fig, 'file') || ~exist(partxt.rms.(srun), 'file')
-            % Do visu fig for the first time (except if it was done previously)
+                || ~exist(Spar.rms_fig, 'file') || ~exist(partxt.rms.(srun), 'file')          
             Sdo.rms(j) = 1;            
         end        
         
         %------------------ Do ICA 
         if fica 
             pica = make_dir(Spar.dir.ica);
-            if (~exist([pica, filesep, 'icaComp_res.mat'], 'file') ||...
-                ~exist([pica, filesep, 'preproc_ica.mat'], 'file'))
+            if (~exist([pica, fsep, 'icaComp_res.mat'], 'file') ||...
+                ~exist([pica, fsep, 'preproc_ica.mat'], 'file'))
                 % Need to make ICA and/or redefine preproc_ica.mat
                 Sdo.ica(j) = 1;
+                Sdo.rmc(j) = 1;
             else
-               [Sdo.ica(j), Spar] = check_ica_preproc(Spar, sinfo); 
+               [Sdo.ica(j), Spar] = check_ica_preproc(Spar, partxt, srun, sinfo); 
+               if Sdo.ica(j)
+                   Sdo.rmc(j) = 1;
+               end
             end
+            % Ask for bad component with already computed ICA
+            if ~Sdo.ica(j) && ~exist(partxt.rmc.(srun), 'file')
+                Sdo.rmc(j) = 1;
+                % Figures are required to select bad components
+                pica_fig = [pica, fsep, 'ica_fig'];
+                if ~exist(pica_fig, 'dir') ||...
+                        isempty(dir([pica_fig, fsep, '*.png']))
+                    Sdo.ica(j) = 1;
+                end
+            end            
         end
         
         %------------------- Do BAD TRIALS identification
@@ -212,7 +242,7 @@ for i = 1 : Ns
         end
         
         %------------------- Do the final epoching !!
-        if any([Sdo.rms(j) Sdo.ica(j) Sdo.rmt(j)])
+        if any([Sdo.rms(j) Sdo.rma(j) Sdo.ica(j) Sdo.rmt(j)])
             Sdo.epch(j) = 1;
         else
             Sdo.epch(j) = check_epochs(Spar, isa_t);
@@ -220,10 +250,11 @@ for i = 1 : Ns
         
         % Add the cleanTrials.mat path to the Sdb
         if ~Sdo.epch(j)
-            Smeg.analysis.clean_mat{j} = [Spar.dir.clean, filesep, 'cleanTrials.mat'];           
+            Smeg.analysis.clean_mat{j} = [Spar.dir.clean, fsep, 'cleanTrials.mat'];           
         else
             Smeg.analysis.new_clean(j) = 1;
         end
+
         Smeg.analysis.clean_dir{j} = Spar.dir.clean;
         
         Smeg.preproc.param_run{j} = Spar;    
@@ -236,8 +267,8 @@ end
 function isep = check_epochs(Spar, isa_t)
 isep = 0;
 pep = Spar.dir.clean;
-ppr = [pep, filesep, 'preproc.mat'];
-pdat = [pep, filesep, 'cleanTrials.mat'];
+ppr = [pep, fsep, 'preproc.mat'];
+pdat = [pep, fsep, 'cleanTrials.mat'];
 
 if ~exist(ppr, 'file') || ~exist(pdat, 'file')
     isep = 1;
@@ -280,7 +311,7 @@ end
 
 function [isrmt, Spar] = check_prep_trials(Spar, isa_t)
 isrmt = 0;
-pptr = [Spar.dir.preproc, filesep, 'preproc_trials.mat'];
+pptr = [Spar.dir.preproc, fsep, 'preproc_trials.mat'];
 if ~exist(pptr, 'file')
     isrmt = 1;
     return;
@@ -395,7 +426,7 @@ fclose(fid);
 
 % Check for previous ICA use regarding to new preprocessing options (rm_sens and
 % rm_art)
-function [isnew, Spar] = check_ica_preproc(Spar, sinfo)
+function [isnew, Spar] = check_ica_preproc(Spar, partxt, srun, sinfo)
    
 %-----------
 % Check if we can use the previous ICA
@@ -405,18 +436,18 @@ function [isnew, Spar] = check_ica_preproc(Spar, sinfo)
 rms = Spar.rm.sens;
 rma = Spar.rm.art;
 pica = Spar.dir.ica;
-comp = loadvar([pica, filesep, 'icaComp_res.mat']);  
+comp = loadvar([pica, fsep, 'icaComp_res.mat']);  
 % Number of components for already processed ICA
 Spar.Ncomp = length(comp.topolabel);    
 
-ppica = [pica, filesep, 'preproc_ica.mat'];
+ppica = [pica, fsep, 'preproc_ica.mat'];
 
 rm_prev = loadvar(ppica); 
 % Check for parameters change // those required to keep ICA
 rms_mod = check_mod(rms, rm_prev.rms);
 % Check if new rma has been added / removed in param_txt file
 % compare to initial rma applied when ICA was computed
-rma_mod = check_mod(rma, rm_prev.rma);                
+rma_mod = check_mod(rma, rm_prev.rma, 'art');                
 
 %------ Warning message for removed sensors / artefacts after ICA
 isnew = warning_ica(rms_mod.removed, rma_mod.removed, sinfo, 'rem');
@@ -425,9 +456,13 @@ if isnew
     return;
 end
 
-% Add removed sensors to the analysis
+% Add removed sensors/artefacts to the analysis
 Spar.rm.sens = [rms ; rms_mod.removed];
 Spar.rm.art = [rma ; rma_mod.removed];
+
+% Write txt files
+write_bad(partxt.rms.(srun), Spar.rm.sens, 'sens');
+write_bad(partxt.rma.(srun), Spar.rm.art, 'art');
 
 %------ Warning for added sensors / artefacts after ICA
 isnew = warning_ica(rms_mod.new_add, rma_mod.new_add, sinfo, 'add');
@@ -448,8 +483,12 @@ save(ppica, 'preproc_ica');
 %   compare to the previous ones
 %-- rms_mod.removed : the BAD sensors/windows that have been deleted from the TXT file
 %   while there where initially used to prepare data for ICA
-function rm_mod = check_mod(cpar, prm_ica)
-
+function rm_mod = check_mod(cpar, prm_ica, cart)
+if nargin < 3
+    isart = 0;
+else
+    isart = strcmp(cart, 'art');
+end
 ppar = [prm_ica.before ; prm_ica.after];
 ppar = prep_param(ppar);
 cpar = prep_param(cpar);
@@ -465,14 +504,22 @@ rm_mod.removed = [];
 % Not the same preproc param
 if ~isempty(setxor(cpar, ppar))
     rm_mod.new_add = out_param(setdiff(cpar, ppar));    
-    rm_mod.removed = out_param(setdiff(prm_ica.before, cpar));
+    rm_mod.removed = out_param(setdiff(prep_param(prm_ica.before), cpar));
+    if isart
+        if isempty(rm_mod.new_add)
+            rm_mod.new_add = [];
+        end
+        if isempty(rm_mod.removed)
+            rm_mod.removed = [];
+        end
+    end
 end
 
 % Format the output param (for artefact windows)
 function cpar = out_param(cpar)
 if ~isempty(cpar) && ~isempty(strfind(cpar{1}, '-')) 
     Na = length(cpar);
-    spar = cellfun(@(x) textscan(x, '%f-%f'), cpar, 'UniformOutput', 0);
+    spar = cellfun(@(x) textscan(x, '%f - %f'), cpar, 'UniformOutput', 0);
     cpar = zeros(Na, 2);
     for i = 1 : Na
         cpar(i, :) = [spar{i}{1} spar{i}{2}];
@@ -488,7 +535,7 @@ if ~isempty(cpar) && ~iscell(cpar)
         cpar = cpar';
     end
     cpar = cellstr(num2str(cpar));
-    cpar = cellfun(@(x) strjoint(strsplitt(x, ' '), '-'), cpar, 'UniformOutput', 0);        
+    cpar = cellfun(@(x) strjoint(strsplitt(x, ' '), ' - '), cpar, 'UniformOutput', 0);        
 end
 
 % Warning message for ICA if preprocessing parameters change is detected

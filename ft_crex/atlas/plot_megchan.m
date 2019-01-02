@@ -10,5 +10,5 @@ idplot = strfind(clab(:,1)','A');
 % Set coordinate units to mm (from m)
 chanpos = grad.chanpos; 
 chanpos = chanpos(idplot,:);
-p = plot3(chanpos(:,1),chanpos(:,2), chanpos(:,3),'o');
+p = plot3c(chanpos,'o');
 set(p,'markersize', 6,'markerfacecolor', [0 0.6 0.75], 'markeredgecolor', [1 0.7 0])

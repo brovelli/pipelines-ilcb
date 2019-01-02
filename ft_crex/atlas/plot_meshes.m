@@ -103,27 +103,32 @@ if opt.newfig
 end
 
 hold on
-hnorm = [];
-hp = zeros(Nm, 1);
+hnrm = struct;
+hpp = zeros(Nm, 1);
 names = cell(Nm, 1);
 g = 1;
 for i = 1 : Nm
     % Prepare mesh: identify vertices and faces fields, set color and name 
     mesh = prep_patch(meshes{i});
     if ~isempty(mesh.faces) && ~isempty(mesh.vertices)
-        hp(g) = patch('faces', mesh.faces, 'vertices', mesh.vertices,...
+        hpp(g) = patch('faces', mesh.faces, 'vertices', mesh.vertices,...
             'edgecolor', mesh.edgecolor, 'edgealpha', mesh.edgealpha, 'facecolor', mesh.facecolor,...
             'facealpha', mesh.facealpha, 'facelighting','gouraud', 'pickableparts', 'none'); 
         if opt.dispnorm 
-            hnorm = add_norm(mesh.vertices, mesh.norm, mesh.edgecolor);    
+            hn = add_norm(mesh.vertices, mesh.norm, mesh.edgecolor);
+            if i>1
+                hnrm(i) = hn;
+            else
+                hnrm = hn;
+            end
+                    
         end
         names{g} = mesh.name;
         g = g + 1;
-    end
-    
+    end   
 end
 
-hleg = put_legend(hp(1:g-1), names(1:g-1));
+hlg = put_legend(hpp(1:g-1), names(1:g-1));
 
 xlabel('x', 'fontsize', 14)
 ylabel('y', 'fontsize', 14)
@@ -131,6 +136,12 @@ zlabel('z', 'fontsize', 14)
 axis equal
 grid on
 rotate3d on
+if nargout>=1
+    hp = hpp;
+    hleg = hlg;
+    hnorm = hnrm;
+end
+
 
 % Add normals
 function hq = add_norm(pos, vec, meshcol)

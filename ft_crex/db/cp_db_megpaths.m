@@ -40,21 +40,33 @@ drun = rundir(pmeg, crun);
 
 %%% TO DO : consider the run_concat if concatenation across run is required
 if isempty(drun)
-    warning('No MEG data found in %s\n', pmeg)
+    warning('No MEG run folder found in %s\n', pmeg)
     return
 end
+% Preprocessing parameters folder
+ppar = make_dir([pmeg, fsep, '_preproc_param']);
 
 % Number of run
 Nd = length(drun);
 %--- Initialize data paths
+%_ Directory with the preprocessing parameter txt files
+Smeg.txt_dir = ppar;
 %_Run directories list
-Smeg.rundir = drun;
+Smeg.run.dir = drun;
+%_ Indication if run dataset is valid for analysis
+Smeg.run.valid = zeros(Nd, 1);
+%_ Associated txt file containing validity flag (could be change by hand in
+%_preproc_param directory)
+Smeg.run.valtxt = cell(Nd, 1);
 %_Number of runs
 Smeg.Nrun = Nd;
 %_Raw data path in DB_MEG
 Smeg.raw = cell(Nd, 1);
 %_Info directory holding relatave raw data path and hdr_event.mat for each run
 Smeg.info = cell(Nd, 1);
+%_ hdr_event data
+Smeg.hdr_event = cell(Nd, 1);
+
 %_Data preprocessing info
 %  -directory ('_preproc') for each run
 Smeg.preproc.dir = cell(Nd, 1);
@@ -84,9 +96,14 @@ for j = 1 : Nd
         praw = praw_meg;
     end
 
+    % Run information (validity)
+    pval = [ppar, fsep, 'validity_', rnam, '.txt'];
+    Smeg.run.valtxt{j} = pval;
+    Smeg.run.valid(j) = add_isval(pval);
+    
     % Add hdr info in _info directory
-    add_hdr(praw, pinfo);
     Smeg.info{j} = pinfo;
+    Smeg.hdr_event{j} = add_hdr(praw, pinfo);    
     
     % Add run directories data paths
     Smeg.raw{j} = praw;
@@ -124,13 +141,22 @@ end
 drun = unique(vertcat(drun_all{:}));
 %%% TO DO - be sure no bug here to find the matching directory...
 
+% Initialize or read run validity
+function isval = add_isval(pval)
+if ~exist(pval, 'file')
+    isval = 1;
+    update_valrun(pval, isval);
+else
+    isval = update_valrun(pval);
+end
+
 % Define the general HDR structure holding general hdr info (as output by ft_read_header) 
 % + events and headshape:
 %- hdr.Fs : sampling frequency in Hz
 %- hdr.grad : grad info
 %- hdr.event : all events found in raw data as returned by ft_read_event
 %- hdr.headshape : headshape as read by ft_read_headshape
-function add_hdr(prawi, pout)
+function phdr = add_hdr(prawi, pout)
 phdr = [pout, filesep, 'hdr_event.mat'];
 if exist(phdr, 'file')
     return;
@@ -159,7 +185,9 @@ else
     end
 end
 if ~isempty(pshape)
-    hdr_event.headshape = ft_read_headshape(pshape);
+    hdr_event.headshape = ft_read_headshape(pshape, 'unit', 'mm');
+else
+    hdr_event.headshape = [];
 end
 
 save(phdr, 'hdr_event');
