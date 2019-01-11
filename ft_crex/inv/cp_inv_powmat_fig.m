@@ -4,6 +4,7 @@ function cp_inv_powmat_fig(Smean, pfig)
 if nargin < 2 || isempty(pfig)
     pfig = make_dir('powmat_fig', 1);
 end
+
 % Info for figure title
 Sinf = Smean.info;
 fqnam = Sinf.param.name;

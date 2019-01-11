@@ -6,7 +6,7 @@ function beamforming_dics(bopt)
 %           {'name', foi_Hz, Df_Hz, Dt_s ;...}  (one row per analysis)
 %      .cond_param: input/output condition name and associated times of interest 
 %           {'cond_in', 'cond_out', t_beg : inc : t_end ; ...}
-%      .norm_cond_out: name of the output condition to be taken as baseline for
+%      .norm_param: name of the output condition to be taken as baseline for
 %       normalization
 %      
 %-- bopt.info: info (subject name / run) to be added on figure title
@@ -29,7 +29,7 @@ function beamforming_dics(bopt)
  %___ Default options
  dopt = struct('param', struct('freq_param', [],...
                                 'cond_param', [],...
-                                'norm_cond_out', []),...
+                                'norm_param', []),...
                 'info', '',...
                 'acond', [],...
                 'fwd', [],...
@@ -54,6 +54,10 @@ if isempty(Sdp)
     return;
 end
 
+% Initialize waitbar
+wb = waitbar(0, 'DICS analysis...', 'name', 'DICS');
+wb_custcol(wb, [0.93 0.69 0.13]);
+
 % Load clean data and forward model 
 %- clean dataset
 cleanTrials = loadvar(bopt.data);
@@ -71,10 +75,13 @@ for i = 1 : Nf
     Sd = Sdp.(fnam);   
     [cond, Nc] = get_names(Sd);
 
+    Sbsl = [];
     % Loop over conditions
     for j = 1 : Nc
         % Condition name (out)
         cdout = cond{j};
+        
+        waitbar((i-1)/Nf + (j-1)/(Nc*Nf), wb, [bopt.info, ': ', fnam, ' - ', cdout]);
         
         % Parameters
         Sdc = Sd.(cdout);     
@@ -100,13 +107,13 @@ for i = 1 : Nf
         % Baseline normalization
         if Sdc.norm_bsl.do
             if Sdc.isbsl
-                Sbsl = bsl_calc_save(Spow, Sdc);               
+                Sbsl.(cdout) = bsl_calc_save(Spow, Sdc);               
                 continue
             end
             if ~isempty(Sdc.norm_bsl.precomp)
                 Sbsl = Sdc.norm_bsl.precomp;
             end
-            Spow = bsl_norm(Spow, Sbsl);
+            Spow = bsl_norm(Spow, Sbsl.(cdout));
         else
             % baseline defined as trial portion that is at time < 0
             %%%% TO DO: more option to define this portion
@@ -116,10 +123,19 @@ for i = 1 : Nf
         save_pow(Spow, Sdc);         
     end
 end
-    
+close(wb);    
 % Fast Andrea's Beamforming   
 function Spow = bmf_dics(trials_tf, fwd_model, info)
 
+% Crop time if NaN values (= TF analysis with time windows and trial duration inducing border
+% cropping) 
+fsp = trials_tf.fourierspctrm;
+isn = isnan(squeeze(fsp(1, 1, 1, :)));
+if any(isn)
+    time = trials_tf.time;
+    trials_tf.time = time(~isn);    
+    trials_tf.fourierspctrm = fsp(:, :, :, ~isn);
+end
 ntr = size(trials_tf.cumtapcnt, 1);
 ntap = trials_tf.cumtapcnt(1);
 nchan = length(trials_tf.label);
@@ -148,9 +164,6 @@ for j = 1 : ntime
     Fspa = transpose(Fspa);
     n   = sum(Fspa~=0,2);  % = Ntrials*Ntapers = 583
     Cfa = Fspa*Fspa'./n(1);
-
-    %%%% ??? to test - but why is there NaN values ??
-    Cfa(isnan(Cfa)) = 0;
     
     % Regularization parameter
     ratio = 0.05;
@@ -248,7 +261,9 @@ for i = 1 : Nt
         sop.faces = fwd.grid.tri;
         sop.norm = fwd.grid.mom';
     end
-    
+    % Keep headmodel (conduction volume) for plots
+    sop.hdm = renamefields(rmfield(fwd.headmodel.bnd, {'coordsys', 'cfg'}),...
+        {'pos', 'tri'}, {'vertices', 'faces'});
     Sp = [];
     Sp.info = info;
     Sp.time = time;
@@ -342,24 +357,25 @@ end
 % Normalize and save data 
 function save_pow(Spow, Sdc)
 
-save(Sdc.mat_out, 'Spow');
+save(Sdc.mat_out, 'Spow', '-v7.3'); 
 info = Sdc.info; %#ok
 pdir = Sdc.dir;
 save ([pdir, fsep, 'info.mat'], 'info')
 
 %- Figure of power across trials for each ROI
 % only of normalized power
-if ~Sdc.norm_bsl.do
-    return;
-end
+% if ~Sdc.norm_bsl.do
+%     return;
+% end
 
 pfig = make_dir([pdir, fsep, 'powmat_fig']);
-[typ, Nty] = get_names(Spow);
-for i = 1 : Nty
-    ctyp = typ{i};
-    cp_inv_powmat_fig(Spow.(ctyp).mean_roi, pfig)
-end
+cp_inv_powmat(Spow, pfig)
 
+pfig = make_dir([pdir, fsep, 'roisig_fig']);
+cp_inv_roisig(Spow, pfig)
+
+pfig = make_dir([pdir, fsep, 'dynmesh_fig']);
+cp_inv_dynmesh(Spow, pfig)
 
 % Mean pow accross ROI for figures
 function Smean = pow_mean_roi(Spowz)
@@ -378,6 +394,7 @@ Na = length(ulab);
 Smean = Spowz;
 % Mean across dipole of the same ROI
 meanroi = zeros(Na, ntr, Nt);
+ci_pow = zeros(Na, ntr, Nt);
 
 % Keep dipole number / ROI
 Ndip = zeros(Na, 1);
@@ -388,9 +405,11 @@ for i = 1 : Na
     Ndip(i) = sum(ilab);
     powr = pow(:, ilab, :);
     meanroi(i, :, :) = squeeze(mean(powr, 2));
+    ci_pow(i, :, :) = squeeze(ci_calc(powr, 2));
 end
 Smean.pow = meanroi;
 Smean.mpow = squeeze(mean(Smean.pow, 2));
+Smean.ci_mpow = squeeze(ci_calc(Smean.pow, 2));
 Smean.label = ulab;
 
 labf = cell(Na, 1);
@@ -435,7 +454,7 @@ end
 cond_param(:, 2) = cellfun(@name_save, cond_param(:, 2), 'UniformOutput', 0);
 
 %----- Condition for normalization
-cbsl = bopt.param.norm_cond_out;
+cbsl = bopt.param.norm_param;
 if ~isempty(cbsl)
     if iscell(cbsl)
         cbsl = cbsl{1};
@@ -448,7 +467,8 @@ if ~isempty(cbsl)
         cbsl = cout{isb};
         ib = find(isb==1);        
         nc = 1 : length(cout);
-        % Order condition to have baseline as first
+        % Order condition to have baseline computation before the relevant power
+        % estimates
         iord = [ib setxor(nc, ib)];
         cond_param = cond_param(iord, :);
     end 
@@ -533,7 +553,7 @@ for i = 1 : Nf
         info.param_bsl = param_bsl;
         
         % Check if computation has been already done     
-        isdone = is_done(pres, info, new_clean);
+        isdone = is_done(pmat, info, new_clean);
         
         if isdone 
             % Keep precompute baseline
@@ -573,7 +593,7 @@ end
 pdir = fileparts(pmat);
 
 % Redo Spow computation if any parameters have been changed
-ppr = [pdir, fsep, 'param_info.mat'];
+ppr = [pdir, fsep, 'info.mat'];
 if ~exist(ppr, 'file') ||...
         ~isequal(info, loadvar(ppr)) ||...
         ~exist(pmat, 'file')

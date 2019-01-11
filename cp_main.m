@@ -75,7 +75,11 @@ Sdir.subj = 'subject_*';
 %----------  MEG data processing options
 mopt = [];
 %- Filtering continuous data
+% Filter type: 'lp' (low-pass), 'hp' (high-pass), 'bp' (band-pass) 
+% or empty '' for no filtering
 mopt.continuous.filt.type = 'bp';
+% Cut-off frequency in Hz (a unique number for 'hp' and 'lp', a vector of 2 number for 'bp'
+% (ex. type = 'bp'; fc = [0.5 400];)
 mopt.continuous.filt.fc = [0.5 400];
 
 %- ICA component rejection 
@@ -101,9 +105,7 @@ mopt.epoched.trialfun = 'trialfun_te';
 % trigfun) and second column = associated epoching intervals as a   
 % [prestim postim] vector, in second with positive values 
 mopt.epoched.condition_dts = {'S', [2.000 1.500]
-                                'A', [2.000 1.500]
-                                'R', [1.500 2.000]
-                                'SAR', [-0.250 3.000]};
+                                'A', [2.000 1.500]};
 
 %%% TO ADD
 % Baseline intervals for each conditions (cf. for study with priming, 
@@ -146,19 +148,45 @@ sopt.dics.freq_param = {'hga', 90, 30, 0.200};
 % 3rd column: times of interest in s as a vector of the central times of the slidding frequency 
 %   analysis windows - must be compatible with the epoched condition_dts
 %   parameters (with the same or shorter time boundaries)
-% => {cond_in, cond_out, toi}
-sopt.dics.cond_param =  {'S', 'S',  -0.700 : 0.005 : 1.500      % Stim
-                        'A', 'A',   -1.000 : 0.005 : 1.000      % Action
-                        'R', 'R',   -0.700 : 0.005 : 1.500      % Reward
-                        'R', 'DEL', -1.300 : 0.005 : 0.700      % Delay
-                        'S', 'BL',  -0.500 : 0.005 : -0.100     % Baseline
-                        'SAR', 'SAR', -0.200 : 0.010 : 3.000};	% SAR
+% 4th column: normalisation indication
+% => {cond_in, cond_out, toi, norm_bsl}
+sopt.dics.cond_param =  {'S', 'S',  -0.700 : 0.005 : 1.500 % Stim
+                        'A', 'A',   -1.000 : 0.005 : 1.000 % Action
+                        'S', 'BL',  -0.500 : 0.005 : -0.100 };% Baseline
 
 % Normalisation
-% Name of the time-frequency output data (baseline) to be used for normalisation (one of the 
-% 2nd column of cond_param)
-% For baseline data, only the mean and std power across time are saved in the result directory 
-sopt.dics.norm_cond_out = 'BL';
+% The normalisation parameters norm_param are defined in a cell with one row per 
+% condition to be normalized (except the condition that is used as baseline), with:
+% 1st column = cond_out name to be normalized 
+% 2nd column = ¤ associated time interval to consider as baseline in second (vector of number 1x2) ex. [-0.5 0]
+%              ¤ or, the cond_out name to be taken as baseline ex. 'BL'
+% => {cond_out, bsl_interval OR bsl_name}
+% ex. norm_param = {'S', [-0.5 0]
+%                   'A', 'BL'};
+%
+% Special cases:
+%-- For dependant conditions only (conditions = time shifts during the same trial)
+% the same cond_out used as baseline can be specified by setting norm_param with
+% the baseline cond_out name directly (one of the 2nd column of cond_param)
+% (ex. norm_param = 'BL');
+%
+%-- For independant conditions, the baseline should correspond to a time interval
+% outside the stimulation (ex. before the trigger)
+% The baseline interval can be specified for each condition with a cell with one
+% row per condition, and
+%   1st col. = cond_out name 
+%   2nd col. = time interval to consider as baseline [vector of number 1 x 2] in
+%   seconds
+% Ex. norm_param = {'S', [-0.5 0]
+%                   'A', [-0.5 0]
+%                  ...}
+% To define a baseline interval from the trial beginning to 0 s for all conditions,
+% norm_param can be let empty (norm_param = [])
+%
+%-- For mixed condition type (dependant/independant), 
+% For each output data (cond_out) - except the condition used as baseline
+
+sopt.dics.norm_param = 'BL';
 
 % Don't forget to add fieldtrip toolbox to the Matlab paths (>= Mars 2018)
 
