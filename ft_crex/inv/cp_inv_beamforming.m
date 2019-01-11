@@ -9,10 +9,9 @@ end
 imeg = is_meg(Sdb);
 if ~any(imeg)
     return
-else
-    Sdbm = Sdb(imeg);
-end 
+end
 
+Sdbm = Sdb(imeg);
 Np = length(Sdbm);
 
 % Initialize waitbar
@@ -28,21 +27,10 @@ for i = 1 : Np
     % Subject info
     sinfo = psubj.sinfo;
     
-    rdir = psubj.meg.rundir;
+    rdir = psubj.meg.run.dir;
     Nr = length(rdir);
     
-	waitbar(i/Np, wb, ['Beamforming: ', sinfo]);
     for j = 1 : Nr
-        
-        srun = rdir{j};
-        waitbar(i/Np, wb, ['Beamforming: ', sinfo, '--', srun]);
-        
-        % Info to be added in figure title
-        bopt.info = [sinfo, '--', srun];
-        
-        % Available conditions in dataset
-        cond = psubj.meg.preproc.param_run{j}.conditions;
-        bopt.acond = cond; 
         
         % Path to the forward model
         pfwd = psubj.fwd.model_run{j};
@@ -50,6 +38,18 @@ for i = 1 : Np
             warning('Forward model not set for subject %s -- Abort beamforming', bopt.info);
             continue;
         end
+        
+        srun = rdir{j};
+        waitbar((i-1)/Ns + (j-1)/(Nr*Ns), wb, ['Beamforming: ', sinfo, '--', srun]);
+        
+        % Info to be added in figure title
+        bopt.info = [sinfo, '--', srun];
+        
+        % Available conditions in dataset
+        cond = psubj.meg.preproc.param_run{j}.conditions;
+        
+        bopt.acond = cond;    
+
         bopt.fwd = pfwd;
         
         % Path to the M/EEG data

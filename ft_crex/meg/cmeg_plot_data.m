@@ -16,7 +16,6 @@ if isempty(pfig) || ~exist(pfig, 'dir')
     pfig = make_dir([pwd, filesep, 'datadisp'], 1);
 end
 
-
 Scol = opt.colors;
 if ~isempty(Scol)
     colab = Scol.col;
@@ -26,17 +25,32 @@ end
 bcol = 'o';
 tcol = 'w';
 
+% Time
 td = ftData.time{1};
-td = td - td(1);    
+td = td - td(1);
+
+% Amplitude
 xall = ftData.trial{1};
 
-Nc = length(xall(:,1));
-nsub = 6; % Une figure par 6 canaux
+% Channels
+label = ftData.label;
+
+% Sort data by croissant channel number
+numc = cellfun(@(x) str2double(regexprep(x, '\D*', '')), label);
+[~, inds] = sort(numc);
+label = label(inds);
+xall = xall(inds, :);
+
+% Channel number
+Nc = length(label);
+% Number of subplot per figure
+nsub = 6;
 vfig = 1 : nsub : Nc;
+% Total number of figures
 Nf = length(vfig);
 
-% Vecteur utilise pour decaler vers le bas chaque subplot
-vbot = 0.008 : 0.005 : 0.008 + 5*0.005;
+% Vector to slightly shift subplot to the bottom
+vbot = 0.008 : 0.005 : 0.008 + (nsub-1)*0.005;
 
 xlz = [0 10] + 100; % Zoom sur le temps
 tp = td(td>=xlz(1) & td<xlz(2));
@@ -57,8 +71,8 @@ for i = 1 : Nf
         ichan = vfig(i) + j-1;
         ip = (j-1)*7;
         ysh = vbot(j);
-        if ichan < Nc
-            chan = ftData.label{ichan};
+        if ichan <= Nc
+            chan = label{ichan};
             %------
             % Subplot des donnees MEG par canal - toute la duree
             subplot(nsub, 7, ip+1 : ip+3)
@@ -97,7 +111,7 @@ for i = 1 : Nf
             end           
         end
     end
-    if ichan > Nc
+    if ichan >= Nc
         iend = Nc;
     else
         iend = ichan;
@@ -113,7 +127,7 @@ for i = 1 : Nf
         'FitBoxToText','off','Position',[0.1 0.88 0.9 0.12]);
 
     namfig = ['datadisp_', snum,'_chan_', ch_ini,'_to_', ch_end];
-    export_fig([pfig,filesep,namfig,'.png'], '-m1.5', '-nocrop')
+    export_fig([pfig,filesep,namfig,'.png'], '-m1.2', '-nocrop')
     close
     waitbar(i/Nf);
 end

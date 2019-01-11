@@ -163,7 +163,7 @@ for i = 1 : Nf
             end         
             % Time signal
             hax(j) = subplot(Nsub, 4, 4*j-2 : 4*j);
-            plot(time, xcomp(k,:));
+            plot(time(1:6:end), xcomp(k,1:6:end));
             xlim(xl_full)
             pos = get(gca,'position');
             set(gca,'position', [pos(1)-0.08 pos(2) pos(3)+0.1 pos(4)])
@@ -189,7 +189,7 @@ for i = 1 : Nf
     if ~check
         % Save figure    
         namsav = ['composig_',sn,'_comp_', num2str(ideb), '_to_', num2str(iend)];
-        export_fig([pfig, filesep, namsav,'.png'],'-m1.5', '-c[20,20,20, NaN]')
+        export_fig([pfig, filesep, namsav,'.png'],'-m1.2', '-c[20,20,20, NaN]')
         
         if ~isempty(xl_zoom)
             for j = 1 : Nsub
@@ -197,7 +197,7 @@ for i = 1 : Nf
                     set(hax(j), 'xlim', xl_zoom);
                 end
             end
-            export_fig([pfig, filesep, namsav,'_detail.png'],'-m1.5', '-c[20,20,20, NaN]')  
+            export_fig([pfig, filesep, namsav,'_detail.png'],'-m1.2', '-c[20,20,20, NaN]')  
         end
     else
         zoom on

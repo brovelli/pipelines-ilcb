@@ -3,11 +3,16 @@ function Sdb = cp_meg_cleanup_trials(Sdb, opt)
 % data is used to extract trial, then resampled at 400 Hz
 %
 %-CREx180803
-
-opt_tr = [];
-opt_tr.type = 'hp';
-opt_tr.fc = 0.5;   
-opt_tr.res_fs = 400;
+dopt = [];
+dopt.type = 'hp';
+dopt.fc = 0.5;   
+dopt.res_fs = 400;
+if ~isfield(opt, 'preproc') || isempty(opt.preproc)
+    opt.preproc = dopt;
+else
+    opt.preproc = check_opt(opt.preproc, dopt);
+end
+opt_tr = opt.preproc;
 
 Ns = length(Sdb);
 
@@ -24,29 +29,33 @@ isa_t = strcmp(eopt.rm_trials_cond, 'same');
 
 fica =  opt.continuous.ica.reject;
 for i = 1 : Ns
-    Sprep = Sdb(i).meg.preproc;
-    waitbar(i/Ns, wb, ['Bad trials: ', Sdb(i).sinfo]);  	
+    dps = Sdb(i);
+    dpmeg = dps.meg;
+    
+    Sprep = dpmeg.preproc;
+    
     if ~any(Sprep.do.rmt)
         continue;
     end
     
     % Subject info
-    sinfo = Sdb(i).sinfo;
+    sinfo = dps.sinfo;
 
     % Run directories
-    rdir = Sdb(i).meg.rundir;
+    rdir = dpmeg.run.dir;
     Nr = length(rdir);
     isbadc = zeros(Nr, 1);
-    
+
     for j = 1 : Nr
         % If the initial data visualisation was already done
         if ~Sprep.do.rmt(j)
             continue;
         end
         srun = rdir{j};
-		
-        waitbar(i/Ns, wb, ['Bad trials: ',  sinfo, '--', srun]); 
-		
+		stit = [sinfo, '--', srun];
+		        
+        waitbar((i-1)/Ns + (j-1)/(Nr*Ns), wb, ['Bad trials: ',  stit]);
+        
         Spar = Sprep.param_run{j};
         
         % If ICA components are to be rejected, the data version to
@@ -64,7 +73,7 @@ for i = 1 : Ns
         
         % idtr allowing for trial identification when all trials are append
         idtr = concat_trial_id(allTrials);
-        fprintf('\n\n-------\n Reject trials/channels:\n %s\n---------\n', [sinfo, '--', srun]);
+        fprintf('\n\n-------\n Reject trials/channels:\n %s\n---------\n', stit);
         [badc, badtr] = rejectvisual_ft(allTa, idtr);
 
         % Add the new bad channels to txt bad sensor list + to the
@@ -87,12 +96,11 @@ for i = 1 : Ns
             write_bad(Sprep.param_txt.rmt.(srun).allcond, rmtr, 'trials');   
             Spar.Ntr.allcond = Ntr.(cnam);
         else
-            
+            % Write bad trials for each condition
             for k = 1 : Nc
                 cnam = cond{k};
                 Spar.rm.trials.(cnam) = badtr{k};
-                write_bad(Sprep.param_txt.rmt.(srun).(cnam), badtr{k}, 'trials');
-                
+                write_bad(Sprep.param_txt.rmt.(srun).(cnam), badtr{k}, 'trials');             
             end
             Spar.Ntr = Ntr;
         end
@@ -134,6 +142,7 @@ if exist(pica, 'file')
     save(pica, 'preproc_ica');
 end
 
+% Launch the ft visual rejection
 function [badc, badtr] = rejectvisual_ft(allTa, idtr)
 isok = 'no';
 while strcmpi(isok(1:2), 'no')           
@@ -141,11 +150,11 @@ while strcmpi(isok(1:2), 'no')
     cfg.channel     = 'all';
     cfg.method      = 'summary';
     cfg.megscale    = 1;
-    cfg.viewmode = 'toggle';
-    cfg.layout = cmeg_det_lay(allTa.label);
-    cfg.keeptrial = 'yes';
+    cfg.viewmode    = 'toggle';
+    cfg.layout      = cmeg_det_lay(allTa.label);
+    cfg.keeptrial   = 'yes';
     cfg.keepchannel = 'no';
-    allTreja       = ft_rejectvisual(cfg, allTa);
+    allTreja        = ft_rejectvisual(cfg, allTa);
     isok = questdlg('Confirm the bad channels/trials selection ?',...
         'Confirm',...
         'No (redo)', 'Yes', 'Yes');
@@ -191,11 +200,16 @@ for j = 2 : Nr
     rms = unique([rms; Sprep.param_run{j}.rm.sens]);
 end
 write_bad(Sprep.param_txt.rms.allrun, rms, 'sens');
-
+% Add merged selection to preproc_trial
 for j = 1 : Nr
-    Sprep.param_run{j}.rm.sens = rms;
-end
-
+    Spar = Sprep.param_run{j};
+    Spar.rm.sens = rms;
+    preproc_trials = loadvar([Spar.dir.preproc, filesep, 'preproc_trials.mat']); 
+    preproc_trials.rm.sens = rms;
+    save([Spar.dir.preproc, filesep, 'preproc_trials.mat'], 'preproc_trials'); 
+    Sprep.param_run{j} = Spar;    
+end             
+        
 % Add the bad channels to be removed after the ICA rejection in
 % the preproc_ica.mat for each run
 % It is assumed here that if the parameter

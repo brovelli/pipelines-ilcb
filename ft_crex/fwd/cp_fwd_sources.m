@@ -22,13 +22,18 @@ Np = length(Sdb);
 radius = dsources_mm/2;
 vol_sphere = 4/3*pi*radius^3;
 
+% Initialize waitbar
+wb = waitbar(0, 'Source preparation...', 'name', 'Forward model');
+wb_custcol(wb, [0 0.6 0.8]);
+
 for i = 1 : Np
-    
+    waitbar((i-1)/Np, wb, ['Sources: ', Sdb(i).sinfo]);
     %-- Data paths
     psubj = Sdb(i);
     
     % Check if other sources already process (cf. cortical or subcortical fields)
-    if isfield(psubj.fwd, 'sources') && exist(psubj.fwd.sources, 'file')
+    % Be sure coregistration check was done before source preparation
+    if exist(psubj.fwd.sources, 'file') || ~psubj.coreg
         continue;
     end
     
@@ -53,6 +58,7 @@ for i = 1 : Np
     pcor = make_dir([psubj.dir, filesep, 'coreg']);
     fwd_coreg_fig(sources, psubj.fwd.shell, psubj.meg, pso, pcor);
 end
+close(wb);
 
 % Only cortical sources with an associated MarsAtlas label should be scanning
 % while beamforming process -- this is done by setting the 'inside' vector with
@@ -79,7 +85,7 @@ for i = 1 : Nh
     surfh = Csurf{i};
     
     % Add normals
-    surfh.mom = add_normals(surfh);
+    surfh.mom = mesh_norm(surfh);
 
     Csurf{i} = surfh;
     % Associated labels - remove 0 and 255 = those who are not in
@@ -178,7 +184,7 @@ for j = 1 : Nd
         end
     end
 end
-
+% Merge Left and Right meshes
 function msurf = merge_surf(Csurf)
 
 Nh = length(Csurf);
@@ -198,20 +204,6 @@ for i = 1 : Nf
     end
 end
     
-% Add normals from the coregistred brain mesh
-function ori = add_normals(mesh)
-mesh.vertices = mesh.pos;
-mesh.faces = mesh.tri;
-ori = patchnormals(mesh);
-isn = isnan(ori(:, 1));
-if any(isn)
-    warning(['Patchnormals function failed to find normals for ',...
-                num2str(sum(isn)), ' vertex - Using fieldtrip normals'])
-    ftnrm = normals(mesh.pos, mesh.tri);
-    ori(isn==1, :) = ftnrm(isn==1, :);
-end
-    
-
 % Define the subcortical sources by using kmeans (euclidean distance) method
 function subcor = set_subsources(atlas, vol_sphere, pfig)
 
@@ -276,7 +268,7 @@ subcor.unit = 'mm';
 %-- Figure
 % Figure showing subcortical region + sources
 plot_vol(atlas, isub);
-plot3(subpos(:, 1), subpos(:, 2), subpos(:, 3), 'og')
+plot3c(subpos, 'og')
 title('Check for subcortical sources', 'color', [1 1 1])
 export_fig([pfig, filesep, 'sources_subcortical.png'], '-m2')
 save_fig([pfig, filesep, 'sources_subcortical.fig'])
@@ -363,7 +355,7 @@ plot_dip_label(gpos, glab, glob);
 
 % Add norms
 gori = grid.mom(ins, :);
-hq = quiver3(gpos(:, 1), gpos(:, 2), gpos(:, 3), gori(:, 1), gori(:, 2), gori(:, 3));
+hq = quiver3c(gpos, gori);
 set(hq, 'AutoScaleFactor', 0.8, 'linewidth', 0.5, 'color', [0.45 0.45 0.35], 'PickableParts', 'none');
 
 view(90, 90)
@@ -390,7 +382,7 @@ for j = 1 : Nlab
     % Associated sources
     ppos = gpos(ipos, :);
     
-    plot3(ppos(:, 1), ppos(:, 2), ppos(:,3),'o','markersize',3,...
+    plot3c(ppos,'o','markersize',3,...
         'markerfacecolor',col(j,:),'markeredgecolor','none',...
         'displayname', [slob, ' - ', slab])
 end
@@ -409,7 +401,7 @@ if ~isempty(sources.subcortical)
     plot_dip_label(subso.pos, subso.label.label, subso.label.lobe)
     ppos = subso.pos;
     % Highlight subcortical
-    pp = plot3(ppos(:, 1), ppos(:, 2), ppos(:,3),'o','markersize',5,'linewidth', 0.8,...
+    pp = plot3c(ppos,'o','markersize',5,'linewidth', 0.8,...
         'markerfacecolor','none','markeredgecolor',[0.9 0.9 0.9]);
     set(pp, 'PickableParts', 'none');
 end
@@ -433,18 +425,18 @@ if ~isempty(pshell)
 end
 
 % Add MEG sensors if pmeg is valid
-if ~isempty(pmeg)
-    praw = pmeg.raw{1};
-    draw = filepath_raw(praw);
-    if ~isempty(draw)
-        % Check reg MEG + vol model only
-        Sgrad = ft_read_sens(draw);
-        plot_megchan(Sgrad)
-        delete(findobj(gcf, 'type', 'legend'))
-        
-        % Print
-        export_fig([pcor, filesep, 'fwd_vol_sources_label_sens.png'], '-m2')
-		save_fig([pcor, filesep, 'fwd_vol_sources_label_sens.fig'])
-    end
+if isempty(pmeg)
+    return;
 end
+hdr = loadvar(pmeg.hdr_event{1});
+if ~isempty(hdr)
+    % Check reg MEG + vol model only
+    plot_megchan(hdr.grad)
+    delete(findobj(gcf, 'type', 'legend'))
+
+    % Print
+    export_fig([pcor, filesep, 'fwd_vol_sources_label_sens.png'], '-m2')
+    save_fig([pcor, filesep, 'fwd_vol_sources_label_sens.fig'])
+end
+
 close 

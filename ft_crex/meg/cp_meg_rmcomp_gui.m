@@ -8,16 +8,16 @@ Ns = length(Sdb);
 
 for i = 1 : Ns
     dps = Sdb(i);
-    
-    Sprep = dps.meg.preproc;
+    dpmeg = dps.meg;
+    Sprep = dpmeg.preproc;
     % If the initial data visualisation was already done
-    if ~any(Sprep.do.ica)
+    if ~any(Sprep.do.rmc)
         continue;
     end
     
     idnam = dps.sinfo;
     
-    drun = dps.meg.rundir;
+    drun = dpmeg.run.dir;
     Nr = length(drun);
     disp_subj(dps.info)
     
@@ -26,11 +26,12 @@ for i = 1 : Ns
     % bad channels - for each run (depending on rm_sens_run option, all bad
     % channels will be merged for all runs (case=='same')
     for j = 1 : Nr
-        if ~Sprep.do.ica(j)
+        if ~Sprep.do.rmc(j)
             continue;
         end
         srun = drun{j};
         
+        stit = [idnam,' -- ', srun];
         Spar = Sprep.param_run{j};
         
         rmc = Spar.rm.comp;
@@ -39,7 +40,7 @@ for i = 1 : Ns
 
         pfig = [pica, filesep, 'ica_fig'];     
         
-        Sdisp.title = {'Bad ICA component selection' ; [idnam,' -- ', srun]};    
+        Sdisp.title = {'Bad ICA component selection' ; stit};    
     
         % Good channels
         Ncomp = Spar.Ncomp;
@@ -52,27 +53,28 @@ for i = 1 : Ns
         Sdisp.dir = pfig;
         
         uiwait(msgbox({'\fontsize{12}Please select the bad component(s) for subject: ';...
-        ['\fontsize{13}\bf ', prep_tex([idnam, ' -- ', srun])]}, 'Bad components', 'help',...
+        ['\fontsize{13}\bf ', prep_tex(stit)]}, 'Bad components', 'help',...
         struct('WindowStyle', 'non-modal', 'Interpreter', 'tex')));
     
-        rmc = preproc_select(Sdisp);
+        [rmc, isbad] = preproc_select(Sdisp);              
+        if isbad
+            update_valrun(dpmeg.run.valtxt{j}, ~isbad);
+            rmc = [];
+            % Update valid run indication
+            Sdb(i).meg.run.valid(j) = ~isbad;
+            % Set all computations to 0
+            Sprep.do = init_do(Sprep.do, j);
+        end  
+        
         Spar.rm.comp = rmc';
         
-        % Write rms
+        % Write rmc
         write_bad(Sprep.param_txt.rmc.(srun), rmc, 'comp')
-        
+
         Sprep.param_run{j} = Spar;
-        Sprep.do.ica(j) = 0;
+        Sprep.do.rmc(j) = 0;
     end
     
     % Merge the bad channel(s) already identified (== those with signal == 0)
     Sdb(i).meg.preproc = Sprep;
 end
-
-function disp_subj(dps, rdir)
-if nargin < 2
-    rdir = [];
-end
-sep = '---------------------------------';
-idnam = [dps.proj, ' ', dps.group, ' ', dps.subj, ' ', rdir];
-fprintf('\n\n%s\n   %s\n%s\n\n', sep, idnam, sep);

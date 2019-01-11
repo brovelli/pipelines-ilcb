@@ -33,11 +33,16 @@ Np = length(Sdb);
 
 % Segment realigned MRI if mri_segment not done yet + define the singleshell
 % head model
+% Initialize waitbar
+wb = waitbar(0, 'Forward modelling...', 'name', 'Singleshell segmentation');
+wb_custcol(wb, [0 0.6 0.8]);
 for i = 1 : Np
+    waitbar((i-1)/Np, wb, ['Singleshell: ', Sdb(i).sinfo]);
     if isempty(Sdb(i).fwd.shell)
         Sdb(i) = prepare_singleshell(Sdb(i));
-    end
+    end  
 end
+close(wb);
 
 function dps = prepare_singleshell(dps)
 
@@ -56,27 +61,13 @@ mri_seg = segment_mri(pdir, mri_resl, subj);
 %-- Prepare the singleshell head model from segmented MRI_realigned
 cfg = [];
 cfg.method = 'singleshell';
-vol_shell = ft_prepare_headmodel(cfg, mri_seg);        
+vol_shell = ft_prepare_headmodel(cfg, mri_seg); %#ok   
 
-pshell = [pfwd, filesep, 'vol_shell.mat'];
+pshell = [pfwd, filesep, 'vol_shell.mat'];  
 save(pshell, 'vol_shell');
 
 % Keep data path
 dps.fwd.shell = pshell;
-
-%-- Draw figure with MEG channels + head conduction volume
-% Place figure in a separated 'coreg' directory to check for the results
-pmeg = dps.meg.raw{1};
-draw = filepath_raw(pmeg);
-fprintf('\nCo-registration figures...')
-if ~isempty(draw)
-    pcor = make_dir([dps.dir, filesep, 'coreg']);
-    Sgrad = ft_read_sens(draw);
-    cmeg_fwd_checkreg_fig(vol_shell, Sgrad, subj, pcor)
-    fprintf('\nCheck for figures in %s\n', pcor);
-else    
-    fprintf('Unable to find raw MEG dataset to add sensor positions\npath=%s\n', pmeg);
-end
         
 % Segment MRI for singleshell conduction volume definition
 function mri_seg = segment_mri(pdir, mri_resl, subj)

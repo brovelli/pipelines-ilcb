@@ -6,6 +6,7 @@ Features:
   - import MarsAtlas volumetric parcellation
   - creates single-shell volume conductor
   - creates leadfield 
+  - perform DICS beamforming
   
 In collaboration with the CREx https://blricrex.hypotheses.org/lequipe, Fardin Afdideh and Mathilde Bonnefond (CRNL, Lyon)
 

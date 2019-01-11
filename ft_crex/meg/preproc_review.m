@@ -22,7 +22,7 @@ function varargout = preproc_review(varargin)
 
 % Edit the above text to modify the response to help preproc_review
 
-% Last Modified by GUIDE v2.5 14-Aug-2018 02:10:59
+% Last Modified by GUIDE v2.5 18-Dec-2018 11:47:50
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -78,7 +78,8 @@ function varargout = preproc_review_OutputFcn(hObject, eventdata, handles)  %#ok
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-varargout{1} = handles.change;  
+varargout{1} = handles.Srev.Sdb;  
+varargout{2} = handles.change;
 delete(hObject)
 
 % --- Executes on selection change in list_subj.
@@ -122,7 +123,8 @@ function but_rs_Callback(hObject, eventdata, handles) %#ok
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 [Sdb, prevs] = set_new(handles, 'rms', 'sens');
-handles.Srev.Sdb = cp_meg_rmsens_gui(Sdb, handles.Srev.opt.continuous);
+i = handles.Srev.isubj(isel);
+handles.Srev.Sdb(i) = cp_meg_rmsens_gui(Sdb(i), handles.Srev.opt.continuous);
 handles = compare_aft(handles, 'sens', prevs);
 % Update handles structure
 guidata(hObject, handles);
@@ -132,16 +134,22 @@ function but_ra_Callback(hObject, eventdata, handles) %#ok
 % hObject    handle to but_ra (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
+[Sdb, prevc] = set_new(handles, 'rma', 'art');
+i = handles.Srev.isubj(isel);
+handles.Srev.Sdb(i) = cp_meg_artefact(Sdb(i));
+handles = compare_aft(handles, 'art', prevc);
 
+% Update handles structure
+guidata(hObject, handles);
 
 % --- Executes on button press in but_rc.
 function but_rc_Callback(hObject, eventdata, handles) %#ok
 % hObject    handle to but_rc (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
 [Sdb, prevc] = set_new(handles, 'ica', 'comp');
-handles.Srev.Sdb = cp_meg_rmcomp_gui(Sdb);
+i = handles.Srev.isubj(isel);
+handles.Srev.Sdb(i) = cp_meg_rmcomp_gui(Sdb(i));
 handles = compare_aft(handles, 'comp', prevc);
 
 % Update handles structure
@@ -152,15 +160,36 @@ function but_rt_Callback(hObject, eventdata, handles) %#ok
 % hObject    handle to but_rt (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-
 [Sdb, prevt] = set_new(handles, 'rmt', 'trials');
-handles.Srev.Sdb = cp_meg_rmtrials_gui(Sdb);
+i = handles.Srev.isubj(isel);
+handles.Srev.Sdb(i) = cp_meg_rmtrials_gui(Sdb(i));
 handles = compare_aft(handles, 'trials', prevt);
 
 % Update handles structure
 guidata(hObject, handles);
-%------------------------------------------------------------- Additionnal
-% functions
+
+% --- Executes on button press in but_badrun.
+function but_badrun_Callback(hObject, eventdata, handles)  %#ok
+% hObject    handle to but_badrun (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+Sdb = handles.Srev.Sdb;
+isel = handles.isel;
+i = handles.Srev.isubj(isel);
+j = handles.Srev.irun(isel);
+pval = Sdb(i).meg.run.valid(j);
+isval = ~pval;
+% Update isbad indication in _info folder
+update_valrun(Sdb(i).meg.run.valtxt{j}, isval);
+Sdb(i).meg.run.valid(j) = isval;
+handles.Srev.Sdb = Sdb;
+handles = disp_param(handles);
+
+% Update handles structure
+guidata(hObject, handles);
+
+%----------------------------------------------------- Additionnal functions
 
 function handles = compare_aft(handles, rmnam, prevrm)
 
@@ -168,9 +197,11 @@ isel = handles.isel;
 i = handles.Srev.isubj(isel);
 j = handles.Srev.irun(isel);
 aftrm = handles.Srev.Sdb(i).meg.preproc.param_run{j}.rm.(rmnam);
+isnew = 0;
 if ~isstruct(prevrm)
     if ~isempty(setxor(aftrm, prevrm))
         handles.change = 1;
+        isnew = 1;        
     end
 else
    [cond, Nc] = get_names(prevrm);
@@ -178,9 +209,14 @@ else
         cnam = cond{k};
         if ~isempty(setxor(aftrm.(cnam), prevrm.(cnam)))
             handles.change = 1;
+            isnew = 1;
             break;
         end
     end 
+end
+% Display new selection
+if isnew
+    handles = disp_param(handles);
 end
 
 function [Sdb, prevelm] = set_new(handles, newnam, rmnam)
@@ -235,6 +271,14 @@ for k = 1 : Nc
     clist{k} = [cnamt, parlist(Str.(cnam))];
 end
 clist = strjoint(clist, ' ; ');
+function [sval, col] = valstr(isval)
+if isval
+    sval = 'Yes';
+    col = [0 0.85 0.3];
+else
+    sval = 'No';
+    col = [0.85 0 0];
+end
 
 function handles = disp_param(handles)
 isel = handles.isel;
@@ -243,6 +287,11 @@ handles.panel.Title = Srev.slist{isel};
 i = Srev.isubj(isel);
 j = Srev.irun(isel);
 Sdb = handles.Srev.Sdb;
+
+[sval, col] = valstr(Sdb(i).meg.run.valid(j));
+handles.lablist_valrun.String = sval;
+handles.lablist_valrun.ForegroundColor = col;
+
 Srm = Sdb(i).meg.preproc.param_run{j}.rm;
 handles.lablist_rs.String = parlist(Srm.sens);
 handles.lablist_ra.String = parlist(Srm.art, 1);

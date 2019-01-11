@@ -1,4 +1,4 @@
-function Sdb = cp_meg_cleanup_ica(Sdb, Nc)
+function Sdb = cp_meg_cleanup_ica(Sdb, opt)
 % ICA for artefact correction by component rejection
 %
 % The ICA is processed on a resampling (at 400 Hz) and HP filtering (0.5 Hz)
@@ -12,22 +12,21 @@ function Sdb = cp_meg_cleanup_ica(Sdb, Nc)
 %
 %-CREx-180726
 
+dopt = [];
+dopt.type = 'hp';
+dopt.fc = 0.5;   
 % Number of components
+dopt.res_fs = 400;
+dopt.Nc = 'all';
 if nargin < 2
-    Nc = 'all';
+    opt = dopt;
+else
+    opt = check_opt(opt, dopt);
 end
-
-fopt = [];
-fopt.type = 'hp';
-fopt.fc = 0.5;   
-fopt.res_fs = 400;
 % ICA components are computed once from a data version that has been HP filetring (> 0.5 Hz),
 % resampling and cleaning from bad channels and strong artefact
-%%%% TO DO: add the case when new artefact / bad sensor is identified => new ICA to process 
 %%%% and add figure showing the diff before_ICA / after_ICA
 % The purpose being only to remove EOG and/or ECG
-opt_ica = fopt;
-
 
 Ns = length(Sdb);
 
@@ -36,8 +35,8 @@ wb = waitbar(0, 'ICA...', 'name', 'MEG preprocessing');
 wb_custcol(wb, [0 0.6 0.8]);
 
 for i = 1 : Ns
-    Sprep = Sdb(i).meg.preproc;
-	waitbar(i/Ns, wb, ['ICA: ', Sdb(i).sinfo]);  	
+    dpmeg = Sdb(i).meg;
+    Sprep = dpmeg.preproc;
     
     if ~any(Sprep.do.ica)
         continue;
@@ -47,7 +46,7 @@ for i = 1 : Ns
     sinfo = Sdb(i).sinfo;
     
     % Run directories
-    rdir = Sdb(i).meg.rundir;
+    rdir = dpmeg.run.dir;
     Nr = length(rdir); 
 
     for j = 1 : Nr
@@ -57,7 +56,8 @@ for i = 1 : Ns
         end
         Spar = Sprep.param_run{j};
         sdir = rdir{j};
-		waitbar(i/Ns, wb, ['ICA: ', sinfo, '--', sdir]); 
+        
+        waitbar((i-1)/Ns + (j-1)/(Nr*Ns), wb, ['ICA: ', sinfo, '--', sdir]);
         
         % Main directory for figures and ICA
         pica = Spar.dir.ica;      
@@ -71,11 +71,11 @@ for i = 1 : Ns
                 
         %-- Filter (at least HP > 0.5 Hz to remove slow oscillations that can
         % make artifacts more difficult to see
-        opt_ica.info = [sinfo, filesep, sdir];
+        opt.info = [sinfo, filesep, sdir];
 
-        opt_ica.figflag = 0;
-        opt_ica.channel = chansel;
-        ftData = cmeg_extract_filt(Spar.dir.raw, opt_ica);     
+        opt.figflag = 0;
+        opt.channel = chansel;
+        ftData = cmeg_extract_filt(Spar.dir.raw, opt);     
 
         if isempty(ftData)
             warning('Problem while extracting data: %s', Spar.dir.raw)
@@ -84,16 +84,15 @@ for i = 1 : Ns
         
         %-- Remove strong artefacts        
         % Eliminate artefacts defined by wina 
-        ftData = cmeg_padding_artefact(ftData, wina);  
+        ftData = cmeg_artefact_rm(ftData, wina);  
         
         %-- Define a resampling version for continuous plots and ICA computation
         % to reduce calculation time        
         cfg = [];
-        cfg.resamplefs = opt_ica.res_fs;
+        cfg.resamplefs = opt.res_fs;
         resData = ft_resampledata(cfg, ftData);       
         
-        % Parameters for ICA calculation
-
+        % Component figure directory
         pfig = [pica, filesep, 'ica_fig'];
         if exist(pfig, 'dir')
             delete([pfig, filesep, '*.png']);
@@ -104,12 +103,12 @@ for i = 1 : Ns
         cfg = [];
         cfg.method = 'runica'; 
         cfg.demean = 'no';
-        cfg.numcomponent = Nc;
+        cfg.numcomponent = opt.Nc;
         comp = ft_componentanalysis(cfg, resData);
         
-        opt_ica.savepath = pfig;
+        opt.savepath = pfig;
         % opt.mode = mod; % => cfg for manual inspection of ICA
-        cmeg_ica_topo_fig(comp, opt_ica)       
+        cmeg_ica_topo_fig(comp, opt)       
         
         % Only the comp.unmixing and topolabel are needed to reject component
         % from the original (not resampled) data set
@@ -130,10 +129,13 @@ for i = 1 : Ns
         % Strong artefact removing
         preproc_ica.rma.before = wina;
         preproc_ica.rma.after = [];
-        preproc_ica.opt = fopt;
+        preproc_ica.opt = opt;
         save([pica, filesep, 'preproc_ica.mat'], 'preproc_ica'); 
-        Sdb(i).meg.preproc.param_run{j} = Spar;     
+        
+        Sprep.param_run{j} = Spar;     
+        Sprep.do.ica(j) = 0;
     end  
+    Sdb(i).meg.preproc = Sprep;
 end
 close(wb);
 

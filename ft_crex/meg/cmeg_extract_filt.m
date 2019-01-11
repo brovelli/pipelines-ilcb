@@ -52,16 +52,22 @@ else
 end
 
 % Extract data from raw 4D or EEG file
-rawData = cmeg_extract_raw(dpath);
+filtData = cmeg_extract_raw(dpath);
 
-if isempty(rawData)
+if isempty(filtData)
     warning('No data found')
     filtData = [];
     return;
 end
- 
+pack; 
 % Apply filter / remove bad channels even if filter is not set
-filtData = cmeg_filt(rawData, opt);
+filtData = cmeg_filt(filtData, opt);
+
+% Automatically correct the 1s at the edge of the continuous data to remove
+% filter artefact (that appears even with a 10s border padding method)
+% No stimulation is expected so close to the border
+tend = filtData.time{1}(end);
+filtData = cmeg_artefact_rm(filtData, [0 2; tend-2 tend]);
 
 if ~nargout
     if israw
@@ -97,7 +103,7 @@ end
 
 if opt.figflag && ~israw
     if isempty(opt.figpath)
-        pfig = make_dir([spath, filesep, 'filt', strp], 1);
+        pfig = make_dir([opt.savepath, filesep, 'filt', preproc_str(opt)], 1);
     end
     
     % Make some figures of the filtered vs raw data

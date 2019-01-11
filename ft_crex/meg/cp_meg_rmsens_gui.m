@@ -1,10 +1,10 @@
-function Sdb = cp_meg_rmsens_gui(Sdb, copt)
+function Sdb = cp_meg_rmsens_gui(Sdb, rm_sens_run)
 % Mark bad sensor(s) and write the bad sensor selection in the param_txt file
 % rmsens_*.txt
 %
 %-CREx-180726
 
-isa_s = strcmp(copt.rm_sens_run, 'same');
+isa_s = strcmp(rm_sens_run, 'same');
 % Get the original MEG channel list once
 hdr = loadvar([Sdb(1).meg.info{1}, filesep, 'hdr_event']);
 ochan = ft_channelselection('meg', hdr.label);
@@ -14,8 +14,8 @@ Ns = length(Sdb);
 
 for i = 1 : Ns
     dps = Sdb(i);
-    
-    Sprep = dps.meg.preproc;
+    dpmeg = dps.meg;
+    Sprep = dpmeg.preproc;
     % If the initial data visualisation was already done
     if ~any(Sprep.do.rms)
         continue;
@@ -23,7 +23,7 @@ for i = 1 : Ns
     
     idnam = dps.sinfo;
 
-    drun = dps.meg.rundir;
+    drun = dpmeg.run.dir;
     Nr = length(drun);
     disp_subj(dps.info)
     
@@ -63,7 +63,16 @@ for i = 1 : Ns
         % Figures directory
         Sdisp.dir = Spar.dir.cleanup_fig;
         
-        rms = preproc_select(Sdisp);
+        [rms, isbad] = preproc_select(Sdisp);
+        if isbad
+            update_valrun(dpmeg.run.valtxt{j}, ~isbad);
+            rms = [];
+            % Update valid run indication
+            Sdb(i).meg.run.valid(j) = ~isbad; 
+            % Set all computations to 0 for run j
+            Sprep.do = init_do(Sprep.do, j);
+        end   
+            
         Spar.rm.sens = rms;
         
         % Write rms
@@ -72,27 +81,8 @@ for i = 1 : Ns
         Sprep.do.rms(j) = 0;
     end
     
-    % Merge the bad channel(s) already identified (== those with signal == 0)
-    if isa_s
-        fprintf('\nMerge the bad channels selection of the %d run(s)\n', Nr)
-        rms = Sprep.param_run{1}.rm.sens;
-        for j = 2 : Nr
-            rms = unique([rms; Sprep.param_run{j}.rm.sens]);
-        end
-        write_bad(Sprep.param_txt.rms.allrun, rms, 'sens');
-        
-        for j = 1 : Nr
-            Sprep.param_run{j}.rm.sens = rms;
-        end
-    end
+    % Merge the bad channel(s) accross run
+    Sprep = merge_bad_sens(Sprep, isa_s);
+
     Sdb(i).meg.preproc = Sprep;
 end
-
-
-function disp_subj(dps, rdir)
-if nargin < 2
-    rdir = [];
-end
-sep = '---------------------------------';
-idnam = [dps.proj, ' ', dps.group, ' ', dps.subj, ' ', rdir];
-fprintf('\n\n%s\n   %s\n%s\n\n', sep, idnam, sep);

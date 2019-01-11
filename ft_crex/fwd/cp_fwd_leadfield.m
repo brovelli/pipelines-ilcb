@@ -24,43 +24,50 @@ function Sdb = cp_fwd_leadfield(Sdb)
 %
 %-CREx180530
 
-Np = length(Sdb);
+% Select subjects with available MEG data
+imeg = is_meg(Sdb);
+if ~any(imeg)
+    return
+end
+
+Sdbm = Sdb(imeg);
+Np = length(Sdbm);
 
 % Initialize waitbar
 wb = waitbar(0, 'Leadfield computation...', 'name', 'Forward model');
 wb_custcol(wb, [0 0.6 0.8]);
 
 for i = 1 : Np
-    psubj = Sdb(i);
+    psubj = Sdbm(i);
     
     % Subject info
     sinfo = psubj.sinfo;
     
-    rdir = psubj.meg.rundir;
+    rdir = psubj.meg.run.dir;
     Nr = length(rdir);
     
-	waitbar(i/Np, wb, ['Leadfield: ', sinfo]);
     for j = 1 : Nr
-        % Check if computation already done according to MEG data
-        % preprocessing (removing of bad channels)
-        pmod = [psubj.meg.analysis.clean_dir{j}, filesep, 'fwd_model.mat'];
-        % Already done
-        if exist(pmod, 'file') && ~psubj.meg.analysis.new_clean(j)
-            Sdb(i).fwd.model_run{j} = pmod;
-            continue
-        end
-        srun = rdir{j};
-        waitbar(i/Np, wb, ['Leadfield: ', sinfo, '--', srun]);
-        % Raw MEG data directory
+        
+        % Don't do computation if meg data are not available
         pinfo = psubj.meg.info{j};
         pmeg = psubj.meg.analysis.clean_mat{j};
-        if isempty(pmeg)
-            warning('Preprocessed MEG data required for leadfield computation...')
-            warning('Computation abort for subject %s\n', [sinfo, '--', srun]);
+        if isempty(pmeg) || ~psubj.meg.run.valid(j)
             continue
         end
+        
+        % Check if forward model is already ready for source analysis
+        pmod = [psubj.meg.analysis.clean_dir{j}, filesep, 'fwd_model.mat'];
+        if exist(pmod, 'file') && ~psubj.meg.analysis.new_clean(j)
+            Sdbm(i).fwd.model_run{j} = pmod;
+            continue
+        end
+        
+        srun = rdir{j};
+        waitbar((i-1)/Ns + (j-1)/(Nr*Ns), wb, ['Leadfield: ', sinfo, '--', srun]);
+        
         % Preproc MEG data directory
         prep = fileparts(pmeg);
+        
         % Set forward model for both cortical and subcortical
         fwd_model = set_model(psubj, pinfo, prep);  
 
@@ -69,7 +76,7 @@ for i = 1 : Np
         save(pmod, 'fwd_model')
 
         % Update Sdb paths
-        Sdb(i).fwd.model_run{j} = pmod;
+        Sdbm(i).fwd.model_run{j} = pmod;
 
         % Leadfield matrix figures
         pso = make_dir([prep, filesep, 'fwd_model']);
@@ -89,6 +96,7 @@ for i = 1 : Np
       
 end
 close(wb);
+Sdb(imeg) = Sdbm;
 % Define fwd model for cortical and (or) subcortical sources
 % model.cortical and model.subcortical both with field:
 % - grid: source model with associated leadfield matrices
@@ -124,7 +132,6 @@ chansel = chan_sel(preproc.rm.sens);
 model = [];
 model.subcortical = prepare_model(sources.subcortical, volshell, Sgrad, chansel);
 model.cortical = prepare_model(sources.cortical, volshell, Sgrad, chansel);
-
 
 % Prepare all that is needed for source estimation / beamforming: head
 % model, source point grid and orientation, associated leadfield

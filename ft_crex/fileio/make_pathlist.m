@@ -1,4 +1,4 @@
-function pathlist = make_pathlist(archicell)
+function plist = make_pathlist(Carch)
 % MAKE_PATHLIST Genere un ensemble de chemins d'acces aux dossiers selon
 % l'architecture definie dans la cellule archicell
 % Ces chemins sont stockes dans la cellule pathlist.
@@ -55,217 +55,127 @@ function pathlist = make_pathlist(archicell)
 %   F:\path1\Project_1\P02\MEG\Run_1
 %   F:\path1\Project_1\P02\MEG\Run_2
       
-pathlist = cell(1,1);
+plist = [];
 
-arch = check_archicell(archicell);
-
+Carch = check_arch(Carch);
+if isempty(Carch)
+    return;
+end
 
 % Initialisation des chemins initiaux
-
-
-inipth = cell(1, 1);
+inipath = cell(1000, 1);
 k = 1;
 
-Nd = length(arch{1, 1});
-for i = 1 : Nd
-    [chem, dos] = fileparts(arch{1,1}{i});
-    partf = find_alldos(chem, dos, arch{1,2});
-    if ~isempty(partf)
-        for j = 1 : length(partf)
-            inipth{k} = partf{j};
+Ni = length(Carch{1, 1});
+for i = 1 : Ni
+    [pini, dnam] = fileparts(Carch{1,1}{i});
+    dlist = dirlist(pini, {dnam, Carch{1,2}});
+    if ~isempty(dlist)
+        Nd = length(dlist);
+        for j = 1 : Nd
+            inipath{k} = dlist{j};
             k = k + 1;
         end
     end
 end
-Na = length(arch(:, 1));
-Ns = k-1;
-if Na==1 && ~isempty(partf)
-    pathlist = partf';
-else
-    % Plusieurs chemins initiaux à sonder
-    
-    for j = 1 : Ns
-        pini = inipth{j};
-        partf = find_alldos(pini, arch{2,1}, arch{2,2});
-        if ~isempty(partf)
-            if j==1
-                parta = partf;
-            else
-                parta = [parta,partf]; %#ok
-            end
-        end
-    end
-    if exist('parta', 'var')
-        pathlist = parta';
-        
-        if Na > 2
-            newarch = cell(Na-1, 2);
-            newarch{1,1} = parta; 
-            newarch{1,2} = 0;
-            newarch(2:Na-1, 1) = arch(3:Na, 1);
-            newarch(2:Na-1, 2) = arch(3:Na, 2);
-            arch = newarch;
-            pathlist = make_pathlist(arch);
-        end
-    end
+inipath = inipath(~cellfun(@isempty, inipath));
+Na = length(Carch(:, 1));
+if Na==1 && ~isempty(inipath)
+    plist = inipath;
+    return
 end
-% Suppression des valeurs vides
-if length(pathlist)>1
-    tmp = pathlist;
-    pathlist = cell(1,1);
-    j = 1;
-    for i = 1 : length(tmp)
-        if ~isempty(tmp{i})
-            pathlist{j} = tmp{i};
-            j = j + 1;
-        end
-    end
-end
-pathlist = pathlist';
-
-if isempty(pathlist{1})
-    disp('--- Directories not found with input architecture')
-end
-function allfound = find_alldos(dpath, begdir, opt)
-    if nargin<3
-        opt = 1;
-    end
-    if opt 
-        aj = '*';
-    else
-        aj = '';
-    end
-    allfound = cell(1,1);
-    if ~iscell(begdir)
-        begdir = {begdir};
-    end
-    begdir = strrep(begdir, '*', '');
-    id = 1;
-    for n = 1:length(begdir)
-
-        fpt = [dpath,filesep,begdir{n},aj];
-        if opt
-            fd = dir(fpt);
-            if ~isempty(fd)
-                for k = 1:length(fd)
-                    if isdir([dpath,filesep,fd(k).name])
-                        allfound{id} = [dpath,filesep,fd(k).name];
-                        id = id+1;
-                    end
-                end
-            end
+Ns = length(inipath);
+% Find folder matching with Carch(2, 1) name list
+for j = 1 : Ns
+    pini = inipath{j};
+    dlist = dirlist(pini, Carch(2, :));
+    if ~isempty(dlist)
+        if j==1
+            parta = dlist;
         else
-            if isdir(fpt)
-                allfound{id} = fpt;
-                id = id+1;
-            end
+            parta = [parta ; dlist]; %#ok
         end
+    end
+end
+if ~exist('parta', 'var')
+    warning('--- Directories not found with input folder structure');
+    return;
+end
 
-    end
+plist = parta;
 
-function arch = check_archicell(archic)
+if Na > 2
+    Carch = [{ parta, 0};  Carch(3:end, :)];
+    plist = make_pathlist(Carch);
+end
 
-    
-    sz = size(archic);
-    
-    % Formatage de archicell
-    % [1] Format erronné - Plusieurs cas possibles :
-    %  Size = 1x1 ou size = 1xN ou size = Nx1 ET chaque element est une
-    %  cellule contenant une ou plusieurs chaines de caractere  
-    % => il manque l'indication du type de recherche souhaite (0 ou 1) en
-    % deuxieme colonne
-    % => parallelement, si le contenu est directement une chaine de 
-    % caractere et non une cellule, il faut le transformer en cellule
-    
-    newarch = cell(1,2);
-    % [1a] Une chaine de caractere seule
-    if ( sz(1)==1 && sz(2)>1 ) && ischar(archic)
-        newarch = {{archic}, 0};
-    end    
-    
-    % [1b] Une cellule uniquement
-    if sz(1)==1 && sz(2)==1 && iscell(archic)
-        newarch = [archic 0];
-    end
-    
-    % [1c] Une inversion ligne / colonne
-    if sz(1)==2 && sz(2)==1 && isnumeric(archic{2}) 
-        if iscell(archic{1})
-            newarch = archic';
-        elseif ischar(archic{1})
-            newarch = {archic(1) archic{2}};
-        end
-    end
-    
-    % [1d] Un tableau de cellules 1xN ou Nx1
-    if ( sz(1)==1 && sz(2)>1 ) || ( sz(1)>1 && sz(2)==1 ) && ~isnumeric(archic{max(sz)})
-        allc = zeros(max(sz), 1);
-        for  k = 1 : max(sz)
-            if ischar(archic{k})
-                archic{k} = archic(k);
-            end
-            allc(k) = iscell(archic{k});
-        end
-        if sum(allc) == max(sz)
-            if sz(2)>1
-                archic = archic';
-            end
-            newarch = archic;
-            newarch(:,2) = deal({1});
-        end
-    end
-    if ~isempty(newarch{1})
-        archic = newarch;
-        sz = size(archic);
-    end
-    
-    % [2] Format correct : N x 2 mais contenu incorrect
-    if sz(1)>=1 && sz(2)==2
-        lg = sz(1);
-        for j = 1:lg
-            if ischar(archic{j,1}) 
-                archic{j,1} = archic(j,1);
-            end
-            if ~ischar(archic{j,1}{1})
-                archic{j,1} = {''};
-                archic{j,2} = 1;
-            end
-            if iscell(archic{j,2}) && isnumeric(archic{j,2}{1})
-                archic{j,2} = archic{j,2}{1};
-            end
-            if ~isnumeric(archic{j,2})
-                archic{j,2} = 1;
-            end
-        end
-    end
-    
-    % [3] Retrait des eventuels separateurs de fichiers a la fin des noms
-    % ainsi que des blancs au debut et a la fin
-    for k = 1:length(archic(:,1))
-        for n = 1:length(archic{k,1})
-            if ~isempty(archic{k,1}{n})
-                while strcmp(archic{k,1}{n}(1),' ')
-                    archic{k,1}{n} = archic{k,1}{n}(2:end);
-                end
-                while strcmp(archic{k,1}{n}(end),' ')
-                    archic{k,1}{n} = archic{k,1}{n}(1:end-1);
-                end  
-                if strcmp(archic{k,1}{n}(end), filesep)
-                    archic{k,1}{n} = archic{k,1}{n}(1:end-1);
+% Make list of existing directories matching with Cfold(1) cell of
+% strings
+function dlist = dirlist(dpath, Cfold)
+opt = Cfold{2};
+cdir = Cfold{1};
+if ischar(cdir)
+    cdir = {cdir};
+end
+Nd = length(cdir);
+
+% Initialize path list
+dlist = cell(1000,1);
+
+k = 1;
+for i = 1 : Nd
+    dnam = cdir{i};
+    if opt
+        dnam = strrep([dnam, '*'], '**', '*');
+        pdir = [dpath, fsep, dnam];
+        ddir = dir(pdir);
+        if ~isempty(ddir)
+            Ns = length(ddir);
+            for j = 1 : Ns
+                % Be sure it's a folder
+                pdirf = [dpath, fsep, ddir(k).name];
+                if exist(pdirf, 'dir')
+                    dlist{k} = pdirf;
+                    k = k + 1;
                 end
             end
         end
-    end
-    arch = archic;
-    
-    % Initialisation
-    pth = arch{1,1};
-
-    for i= 1:length(pth)
-        % Cas ou pth{i} est un nom de fichier/dossier et non un chemin
-        if isempty(strfind(pth{i},filesep)) 
-            arch{1,1}{i}=[pwd, filesep, pth{i}];
+    else
+        pdir = [dpath, fsep, dnam];
+        if exist(pdir, 'dir')
+            dlist{k} = pdir;
+            k = k + 1;
         end
     end
+end
+dlist = dlist(~cellfun(@isempty, dlist));
+
+function Carch = check_arch(Carch) 
+if isempty(Carch) || (iscell(Carch) && isempty(Carch{1}))
+    Carch = [];
+    return;
+end
+
+Na = length(Carch(:, 1));
+% Be sure searching strings are in a cell
+for i = 1 : Na
+    if ischar(Carch{i, 1})
+        Carch{i, 1} = Carch(i, 1);
+    end
+end
+% Remove the blanks at the beginning or end of the search strings
+Carch(:, 1) = cellfun(@(x) regexprep(x, '^\s* | \s*$', ''), Carch(:, 1), 'UniformOutput', 0);
+% Remove the final filesep if any
+Carch(:, 1) = cellfun(@(x) regexprep(x, ['\', fsep, '$'], ''), Carch(:, 1), 'UniformOutput', 0);
+
+% Initialisation paths
+pth_ini = Carch{1,1};
+Ni = length(pth_ini);
+for i = 1 : Ni
+    pini = pth_ini{i};
+    if ~containss(pini, fsep) 
+        Carch{1,1}{i}=[pwd, fsep, pini];
+    end
+end
 
       

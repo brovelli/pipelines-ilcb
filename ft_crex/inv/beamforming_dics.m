@@ -107,7 +107,11 @@ for i = 1 : Nf
                 Sbsl = Sdc.norm_bsl.precomp;
             end
             Spow = bsl_norm(Spow, Sbsl);
-        end 
+        else
+            % baseline defined as trial portion that is at time < 0
+            %%%% TO DO: more option to define this portion
+            Spow = bsl_norm_indep(Spow);
+        end
         % Save Spow and do figures if normalized power
         save_pow(Spow, Sdc);         
     end
@@ -145,6 +149,9 @@ for j = 1 : ntime
     n   = sum(Fspa~=0,2);  % = Ntrials*Ntapers = 583
     Cfa = Fspa*Fspa'./n(1);
 
+    %%%% ??? to test - but why is there NaN values ??
+    Cfa(isnan(Cfa)) = 0;
+    
     % Regularization parameter
     ratio = 0.05;
     lambda = ratio * trace(Cfa)/size(Cfa,1);
@@ -283,6 +290,32 @@ save(Sdc.mat_out, 'Sbsl');
 % done
 info = Sdc.info; %#ok
 save([Sdc.dir, fsep, 'info.mat'], 'info');
+
+% Do baseline normalization
+function Spow = bsl_norm_indep(Spow)
+[typ, Nty] = get_names(Spow);
+
+for i = 1 : Nty
+    ctyp = typ{i};
+    Sp = Spow.(ctyp);
+
+    Nt = length(Sp.time);
+
+    bsl = Sp.pow(:, :, Sp.time < 0);
+    bmean = mean(bsl, 3);
+    bstd = std(bsl, 0, 3);
+    
+    mBL = repmat(bmean, [1 1 Nt]);
+    sBL = repmat(bstd, [1 1 Nt]);
+
+    powr = Sp.pow;
+    Sp.pow = (powr - mBL) ./ sBL;
+
+    % Add mean power across ROI for further figures
+    Sp.mean_roi = pow_mean_roi(Sp);
+    
+    Spow.(ctyp) = Sp;
+end
 
 % Do baseline normalization
 function Spow = bsl_norm(Spow, Sbsl)

@@ -28,17 +28,19 @@ for i = 1 : Ns
     % Subject info
     sinfo = Sdb(i).sinfo;
     % Run directories
-    rdir = dpm.rundir;
-    waitbar(i/Ns, wb, ['Epoching: ', sinfo]);
-    for j = 1 : dpm.Nrun
+    rdir = dpm.run.dir;
+    
+    Nr = dpm.Nrun;
+    for j = 1 : Nr
+       
         % If the initial data visualisation was already done
         if ~Sprep.do.epch(j)
             continue;
         end
 		
-        srun = rdir{j};
-        waitbar(i/Ns, wb, ['Epoching: ', sinfo, '--', srun]);
-		
+        srun = rdir{j};		
+        waitbar((i-1)/Ns + (j-1)/(Nr*Ns), wb, ['Epoching: ', sinfo, '--', srun]);
+        
         Spar = Sprep.param_run{j};
         
         % Prepare data for epoching
@@ -62,6 +64,12 @@ for i = 1 : Ns
             else
                 badtr = Spar.rm.trials.allcond;
             end
+            % Add the artefacted trials
+            iart = find(trials.hdr.artefact);
+            if ~isempty(iart)
+                badtr = unique([badtr ; iart]);
+            end
+            
             if isempty(badtr)
                 continue
             end
