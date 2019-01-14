@@ -6,7 +6,7 @@ function  allTrials = extract_trials(ftData, Spar, eopt)
 isa_t = strcmp(eopt.rm_trials_cond, 'same');
 % eopt.datafile is required in cmeg_extract_trials by ft_definetrial if the default trialfun
 % function is used ('ft_trialfun_general')
-eopt.datafile = Spar.dir.raw;
+eopt.datafile = filepath_raw(Spar.dir.raw);
 % Return event structures without trials falling inside strong artefacts (if any)
 [Strig, allev, iwart] = prepare_event(Spar, eopt.trigfun);
 

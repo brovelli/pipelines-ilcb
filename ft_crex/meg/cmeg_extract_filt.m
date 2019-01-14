@@ -52,16 +52,16 @@ else
 end
 
 % Extract data from raw 4D or EEG file
-filtData = cmeg_extract_raw(dpath);
+rawData = cmeg_extract_raw(dpath);
 
-if isempty(filtData)
+if isempty(rawData)
     warning('No data found')
     filtData = [];
     return;
 end
-pack; 
+
 % Apply filter / remove bad channels even if filter is not set
-filtData = cmeg_filt(filtData, opt);
+filtData = cmeg_filt(rawData, opt);
 
 % Automatically correct the 1s at the edge of the continuous data to remove
 % filter artefact (that appears even with a 10s border padding method)

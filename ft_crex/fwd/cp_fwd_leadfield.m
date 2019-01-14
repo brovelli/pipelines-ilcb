@@ -31,13 +31,13 @@ if ~any(imeg)
 end
 
 Sdbm = Sdb(imeg);
-Np = length(Sdbm);
+Ns = length(Sdbm);
 
 % Initialize waitbar
 wb = waitbar(0, 'Leadfield computation...', 'name', 'Forward model');
 wb_custcol(wb, [0 0.6 0.8]);
 
-for i = 1 : Np
+for i = 1 : Ns
     psubj = Sdbm(i);
     
     % Subject info

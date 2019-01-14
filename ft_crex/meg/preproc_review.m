@@ -266,7 +266,7 @@ for k = 1 : Nc
     if strcmp(cnam, 'allcond')
         cnamt = 'Same for all conditions: ';
     else
-        cnamt = ['Condition ', cnam,': '];
+        cnamt = ['[', cnam,']: '];
     end
     clist{k} = [cnamt, parlist(Str.(cnam))];
 end

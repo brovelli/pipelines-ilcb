@@ -18,12 +18,14 @@ freq = spData.freq;
 spectra = spData.spectra;
 
 % Mean spectrum values in frequency band
-msp = mean(spectra(:, freq >fbd(1) & freq < fbd(2)), 2);
+msp = mean(log10(spectra(:, freq >fbd(1) & freq < fbd(2))), 2);
+mmsp = median(msp);
 % Standard deviation of mean values
-sdev = std(msp);
+% sdev = std(msp);
 
 % Index of extremum values (median value +/- a factor (m) * sdev)
-ibad = find(msp <= median(msp)-m*sdev | msp > median(msp)+m*sdev);
+sdev = 1;
+ibad = find(msp <= mmsp-m*sdev | msp > mmsp+m*sdev);
 if isempty(ibad)
     zchan = [];
 else

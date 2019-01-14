@@ -12,7 +12,7 @@ if ~any(imeg)
 end
 
 Sdbm = Sdb(imeg);
-Np = length(Sdbm);
+Ns = length(Sdbm);
 
 % Initialize waitbar
 wb = waitbar(0, 'Beamforming computation...', 'name', 'Source analysis');
@@ -21,7 +21,7 @@ wb_custcol(wb, [0 0.6 0.8]);
 bopt = [];
 bopt.param = opt.(opt.method);
 
-for i = 1 : Np
+for i = 1 : Ns
     psubj = Sdbm(i);
     
     % Subject info
