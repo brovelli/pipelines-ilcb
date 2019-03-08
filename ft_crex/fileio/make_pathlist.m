@@ -133,7 +133,7 @@ for i = 1 : Nd
             Ns = length(ddir);
             for j = 1 : Ns
                 % Be sure it's a folder
-                pdirf = [dpath, fsep, ddir(k).name];
+                pdirf = [dpath, fsep, ddir(j).name];
                 if exist(pdirf, 'dir')
                     dlist{k} = pdirf;
                     k = k + 1;
