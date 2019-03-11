@@ -107,13 +107,14 @@ for i = 1 : Nf
         % Baseline normalization
         if Sdc.norm_bsl.do
             if Sdc.isbsl
-                Sbsl.(cdout) = bsl_calc_save(Spow, Sdc);               
+                Sbsl = bsl_calc_save(Spow, Sdc);   
+                %%% TO DO Sbsl.(cdout) (different bsl / condition)             
                 continue
             end
             if ~isempty(Sdc.norm_bsl.precomp)
                 Sbsl = Sdc.norm_bsl.precomp;
             end
-            Spow = bsl_norm(Spow, Sbsl.(cdout));
+            Spow = bsl_norm(Spow, Sbsl);  %%%% TO DO .(cdout)
         else
             % baseline defined as trial portion that is at time < 0
             %%%% TO DO: more option to define this portion
@@ -460,7 +461,7 @@ if ~isempty(cbsl)
         cbsl = cbsl{1};
     end
     cout = cond_param(:, 2);
-    isb = ismember({cbsl}, cout);
+    isb = ismember(cout, {cbsl});
     if ~any(isb)
         cbsl = [];
     else
